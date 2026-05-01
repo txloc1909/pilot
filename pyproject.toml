@@ -4,4 +4,10 @@ version = "0.1.0"
 description = "Personal and opinionated coding agent harness"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["pydantic>=2.5"]
+
+[project.scripts]
+pilot = "pilot.__main__:main"
+
+[tool.uv]
+package = true
