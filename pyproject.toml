@@ -1,0 +1,7 @@
+[project]
+name = "pilot"
+version = "0.1.0"
+description = "Personal and opinionated coding agent harness"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
