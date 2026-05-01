@@ -6,7 +6,7 @@ use.
 Aims to be self-improving; I should be able to use `pilot` to develop & improve
 `pilot` itself
 
-Start out as a Python port of [pi](pi.dev) version 0.71.1.
+Start out as a Python port of [pi](pi.dev) v0.70.6
 
 The name `pilot` has dual meaning: 
 - Reference to original `pi` project
