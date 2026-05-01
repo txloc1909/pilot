@@ -9,6 +9,59 @@ only on components listed above it. Port them in order.
 
 ---
 
+## Strategy: Interim Period
+
+Before committing to the full port, run an interim period where pi remains the
+daily driver while Python logic is written and validated alongside it.
+
+**How it works:**
+
+You run `pi` normally in interactive mode. Pi loads a TypeScript extension from
+`.pi/extensions/` at startup. That extension registers custom tools whose
+`execute` functions spawn Python subprocesses to handle the actual logic. Your
+harness opinions live entirely in the Python scripts; the TypeScript extension
+is only a thin dispatch layer.
+
+```
+pi (interactive, normal)
+  └─ loads .pi/extensions/harness.ts   ← thin TS shim, ~50–100 lines
+        └─ tool.execute() spawns python scripts/tool_name.py
+              └─ Python script contains actual logic, returns JSON to stdout
+```
+
+You never run a separate harness process. You just run `pi` as usual and your
+Python code is invoked on demand when the agent calls a custom tool.
+
+**Phases:**
+
+- **Phase 1** — Pi is the only runtime. The TS extension calls Python scripts
+  for custom tools. Pi components are ported to Python in parallel. Harness
+  opinions accumulate in the Python codebase.
+- **Phase 2** — The Python harness is runnable but not yet on par with pi. Both
+  are used: pi for daily work, the Python harness for testing specific sessions.
+  The TS extension remains in service and provides a live feedback loop — changes
+  to Python logic are immediately exercised through everyday pi usage.
+- **Phase 3** — The Python harness completely replaces pi. The TS extension is
+  deprecated.
+
+**Exit condition for Phase 2:** once the agent loop (Component 2) and tools
+(Component 3) are fully ported and a complete session can be run end-to-end in
+the Python harness, stop using pi and switch over entirely.
+
+**Limitations of the interim (why Phase 3 must happen):**
+- The agent loop, session management, and TUI remain black boxes in TypeScript.
+- Pi's extension API is still moving; the shim will need occasional updates.
+- Deep self-improvement (changing loop behavior, compaction strategy, TUI) is
+  not possible until the full port is done.
+
+**Version discipline:**
+- The `pi-mono` submodule must be pinned to the same version as the locally
+  installed `pi` binary at all times.
+- When upgrading `pi`, bump the submodule in the same commit.
+- Document the pinned version in the repo README.
+
+---
+
 ## Component 1: Provider Abstraction (`pi-ai`)
 
 ### What it does
