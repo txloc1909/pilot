@@ -1,33 +1,117 @@
-"""Provider abstraction layer.
+"""OpenRouter provider — lean, single-provider streaming.
 
-Contains the `stream` async generator that normalises different LLM provider
-APIs into a common event stream. Stubs are provided for future implementation.
+Usage::
+
+    from pilot_provider import stream, get_model, Model
+
+    async for event in stream("anthropic/claude-sonnet-4", messages, api_key="sk-..."):
+        match event.type:
+            case "text":        print(event.delta, end="")
+            case "thinking":    print(event.delta, end="")
+            case "tool_call":   ...
+            case "usage":       print(f"Tokens: {event.usage.total_tokens}")
+            case "stop":        print(f"Done: {event.reason}")
+            case "error":       print(f"Error: {event.error.error_message}")
 """
 
-from typing import AsyncGenerator, List, Dict, Any
-from pydantic import BaseModel
+from pilot_provider.openrouter import (
+    OPENROUTER_BASE_URL,
+    build_params,
+    calculate_cost,
+    clamp_thinking_level,
+    convert_messages,
+    convert_tools,
+    get_api_key,
+    get_model,
+    get_models,
+    get_providers,
+    get_supported_thinking_levels,
+    refresh_models,
+    register_model,
+    set_cache_path,
+    set_cache_ttl,
+    stream,
+    stream_openrouter,
+)
+from pilot_provider.types import (
+    AssistantMessage,
+    Context,
+    ErrorEvent,
+    ImageContent,
+    Message,
+    Model,
+    ModelCost,
+    ModelThinkingLevel,
+    OpenRouterRouting,
+    ProviderEvent,
+    SimpleStreamOptions,
+    StopEvent,
+    StopReason,
+    StreamOptions,
+    TextContent,
+    TextEvent,
+    ThinkingContent,
+    ThinkingEvent,
+    ThinkingLevel,
+    ThinkingLevelMap,
+    Tool,
+    ToolCall,
+    ToolCallEvent,
+    ToolResultMessage,
+    Usage,
+    UsageCost,
+    UsageEvent,
+    UserMessage,
+)
 
-
-class ProviderEvent(BaseModel):
-    """Base class for normalized events emitted by providers."""
-    type: str
-    data: Dict[str, Any]
-
-
-async def stream(provider: str, model: str, messages: List[Dict[str, Any]], tools: List[Dict[str, Any]]) -> AsyncGenerator[ProviderEvent, None]:
-    """Yield normalized events from the selected LLM provider.
-
-    Parameters
-    ----------
-    provider: str
-        Name of the provider (e.g., "openai", "anthropic").
-    model: str
-        Model identifier.
-    messages: List[Dict[str, Any]]
-        Conversation history formatted for the provider.
-    tools: List[Dict[str, Any]]
-        Tool definitions the model can call.
-    """
-    # TODO: implement provider specific streaming logic.
-    # Placeholder yields a single dummy text event.
-    yield ProviderEvent(type="text", data={"content": "[stub response]"})
+__all__ = [
+    # High-level API
+    "stream",
+    "stream_openrouter",
+    # Model registry
+    "get_model",
+    "get_models",
+    "get_providers",
+    "register_model",
+    "refresh_models",
+    "set_cache_path",
+    "set_cache_ttl",
+    "calculate_cost",
+    "clamp_thinking_level",
+    "get_supported_thinking_levels",
+    # Helpers
+    "get_api_key",
+    "build_params",
+    "convert_messages",
+    "convert_tools",
+    "OPENROUTER_BASE_URL",
+    # Types
+    "AssistantMessage",
+    "Context",
+    "ErrorEvent",
+    "ImageContent",
+    "Message",
+    "Model",
+    "ModelCost",
+    "ModelThinkingLevel",
+    "OpenRouterRouting",
+    "ProviderEvent",
+    "SimpleStreamOptions",
+    "StopEvent",
+    "StopReason",
+    "StreamOptions",
+    "TextContent",
+    "TextEvent",
+    "ThinkingContent",
+    "ThinkingEvent",
+    "ThinkingLevel",
+    "ThinkingLevelMap",
+    "Tool",
+    "ToolCall",
+    "ToolCallEvent",
+    "ToolResultMessage",
+    "Usage",
+    "UsageCost",
+    "UsageEvent",
+    "UserMessage",
+]
