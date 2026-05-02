@@ -65,17 +65,29 @@ def get_api_key() -> Optional[str]:
 
 
 # =====================================================================
-# Model registry — fetched from OpenRouter API, cached on disk
+# Model registry — curated list from author, enriched from API
 # =====================================================================
 
+# Curated model IDs — only these are registered and fetched from the API.
+# Edit this list to add/remove models.
+_CURATED_IDS: List[str] = [
+    "anthropic/claude-haiku-4.5",
+    "anthropic/claude-sonnet-4.6",
+    "anthropic/claude-opus-4.7",
+    "z-ai/glm-5.1",
+    "moonshotai/kimi-k2.6",
+    "deepseek/deepseek-v4-flash",
+    "deepseek/deepseek-v4-pro",
+    "deepseek/deepseek-v3.2",
+]
 _registry: Dict[str, Model] = {}  # model_id -> Model
 _registry_loaded: bool = False
-_cache_path: Optional[str] = None  # set by set_cache_path()
+_cache_path: Optional[str] = None
 _cache_ttl_seconds: int = 3600  # 1 hour default
 
 
 def set_cache_path(path: str) -> None:
-    """Set the on-disk cache file for model data. Defaults to a temp file."""
+    """Set the on-disk cache file for model data."""
     global _cache_path
     _cache_path = path
 
@@ -92,12 +104,7 @@ def register_model(model: Model) -> None:
 
 
 def get_model(provider: str, model_id: str) -> Optional[Model]:
-    """Look up a model by provider and id.
-
-    For OpenRouter, provider is ignored — lookup is by model_id alone.
-    Triggers a fetch from the OpenRouter API on first call if the registry
-    is empty.
-    """
+    """Look up a model by id. Provider arg is ignored."""
     _ensure_loaded()
     return _registry.get(model_id)
 
@@ -121,10 +128,16 @@ def _ensure_loaded() -> None:
         return
     _registry_loaded = True
 
+    if not _CURATED_IDS:
+        return  # No curated list; registry stays empty
+
     # Try disk cache first
     cached = _load_cache()
     if cached is not None:
-        _registry.update(cached)
+        # Only take curated models from cache
+        for mid in _CURATED_IDS:
+            if mid in cached:
+                _registry[mid] = cached[mid]
         return
 
     # Fetch from API (sync, but only happens once per process)
@@ -159,7 +172,7 @@ def _load_cache() -> Optional[Dict[str, Model]]:
 
 
 def _save_cache(models: Dict[str, Model]) -> None:
-    """Persist models to disk cache."""
+    """Persist all fetched models to disk cache (not just curated)."""
     path = _cache_path or _default_cache_path()
     try:
         raw = {mid: m.model_dump() for mid, m in models.items()}
@@ -170,7 +183,10 @@ def _save_cache(models: Dict[str, Model]) -> None:
 
 
 def _fetch_models_sync() -> Dict[str, Model]:
-    """Fetch all models from the OpenRouter API (synchronous)."""
+    """Fetch curated models from the OpenRouter API (synchronous).
+
+    Only parses and returns models whose id is in _CURATED_IDS.
+    """
     import urllib.request
 
     url = f"{OPENROUTER_BASE_URL}/models"
@@ -178,11 +194,15 @@ def _fetch_models_sync() -> Dict[str, Model]:
     with urllib.request.urlopen(req, timeout=10) as resp:
         data = json.loads(resp.read())
 
+    curated_set = set(_CURATED_IDS)
     models: Dict[str, Model] = {}
     for item in data.get("data", []):
+        mid = item.get("id", "")
+        if mid not in curated_set:
+            continue
         model = _parse_api_model(item)
         if model:
-            models[model.id] = model
+            models[mid] = model
     return models
 
 
@@ -235,9 +255,7 @@ def _parse_api_model(item: Dict[str, Any]) -> Optional[Model]:
 
     # Max completion tokens
     max_tokens = top.get("max_completion_tokens") or 0
-    if isinstance(max_tokens, int):
-        pass
-    else:
+    if not isinstance(max_tokens, int):
         max_tokens = 0
 
     return Model(
@@ -257,13 +275,14 @@ def _parse_api_model(item: Dict[str, Any]) -> Optional[Model]:
 
 
 async def refresh_models() -> None:
-    """Force-fetch models from the OpenRouter API and update the registry.
+    """Force-fetch curated models from the OpenRouter API and update the registry.
 
     Call this explicitly if you want to refresh pricing / model availability
     without waiting for the cache to expire.
     """
     import asyncio
     global _registry_loaded
+
     fetched = await asyncio.to_thread(_fetch_models_sync)
     _registry.update(fetched)
     _save_cache(fetched)

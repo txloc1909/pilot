@@ -17,6 +17,7 @@ import pytest
 
 from pilot_provider.openrouter import (
     OPENROUTER_BASE_URL,
+    _fetch_models_sync,
     _map_stop,
     _parse_api_model,
     _parse_streaming_json,
@@ -123,7 +124,6 @@ class TestModelRegistry:
         assert model.cost.cache_write == pytest.approx(3.75)
 
     def test_parse_api_model_reasoning_detection(self) -> None:
-        # Model without reasoning support
         no_reason = {**_SAMPLE_API_MODEL, "supported_parameters": ["max_tokens", "tools"]}
         model = _parse_api_model(no_reason)
         assert model is not None
@@ -149,46 +149,83 @@ class TestModelRegistry:
         assert _parse_api_model({}) is None
 
     def test_register_and_get_model(self) -> None:
-        # Direct registration still works
+        """Manual register_model() bypasses curated list."""
         m = _model(id="custom/test")
         register_model(m)
-        # get_model triggers _ensure_loaded which tries to fetch;
-        # with a fresh registry it may or may not succeed depending on network.
-        # But our manually registered model should be findable.
         result = get_model("openrouter", "custom/test")
         assert result is not None
         assert result.name == "Test Model"
 
+    def test_curated_list_filters_api_fetch(self) -> None:
+        """Only curated model IDs are fetched from the API, not all 371."""
+        import pilot_provider.openrouter as _mod
+
+        # Set curated list to just one model
+        _mod._CURATED_IDS = ["anthropic/claude-sonnet-4"]
+        _mod._registry_loaded = False
+        _mod._registry.clear()
+
+        mock_response = json.dumps({
+            "data": [_SAMPLE_API_MODEL, {
+                "id": "openai/gpt-4.1",
+                "name": "OpenAI: GPT-4.1",
+                "context_length": 1047576,
+                "architecture": {"input_modalities": ["text", "image"], "output_modalities": ["text"]},
+                "pricing": {"prompt": "0.000002", "completion": "0.000008"},
+                "top_provider": {"max_completion_tokens": 4096},
+                "supported_parameters": ["max_tokens", "tools"],
+            }]
+        }).encode()
+
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            mock_resp = MagicMock()
+            mock_resp.read.return_value = mock_response
+            mock_resp.__enter__ = MagicMock(return_value=mock_resp)
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            mock_urlopen.return_value = mock_resp
+
+            # get_model triggers _ensure_loaded -> _fetch_models_sync
+            model = get_model("openrouter", "anthropic/claude-sonnet-4")
+            assert model is not None
+
+            # Non-curated model should NOT be in registry
+            assert get_model("openrouter", "openai/gpt-4.1") is None
+
+        # Reset
+        _mod._CURATED_IDS = []
+        _mod._registry_loaded = False
+
     def test_cache_round_trip(self) -> None:
+        import pilot_provider.openrouter as _mod
         with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
             cache_path = f.name
         try:
             set_cache_path(cache_path)
             set_cache_ttl(9999)
-            # Manually build a registry entry and save
-            from pilot_provider.openrouter import _save_cache, _load_cache, _registry
+            # Save to cache
             m = _model(id="cache/test")
-            _registry["cache/test"] = m
-            _save_cache({"cache/test": m})
+            _mod._registry["cache/test"] = m
+            _mod._save_cache({"cache/test": m})
 
-            # Clear in-memory, load from cache
-            _registry.clear()
-            from pilot_provider.openrouter import _registry_loaded
-            import pilot_provider.openrouter as _mod
+            # Reset and reload
+            _mod._registry.clear()
             _mod._registry_loaded = False
+            # Need curated list to include our test id for cache loading
+            _mod._CURATED_IDS = ["cache/test"]
             loaded = get_model("openrouter", "cache/test")
             assert loaded is not None
             assert loaded.id == "cache/test"
         finally:
             os.unlink(cache_path)
-            # Reset
-            import pilot_provider.openrouter as _mod
             _mod._registry_loaded = False
+            _mod._CURATED_IDS = []
             _mod._cache_path = None
 
-    def test_fetch_models_from_api(self) -> None:
-        """Test that _fetch_models_sync parses a mocked API response."""
-        from pilot_provider.openrouter import _fetch_models_sync
+    def test_fetch_models_filters_to_curated(self) -> None:
+        """_fetch_models_sync only returns models in _CURATED_IDS."""
+        import pilot_provider.openrouter as _mod
+
+        _mod._CURATED_IDS = ["anthropic/claude-sonnet-4"]
 
         mock_response = json.dumps({
             "data": [_SAMPLE_API_MODEL, {
@@ -210,14 +247,20 @@ class TestModelRegistry:
             mock_urlopen.return_value = mock_resp
 
             result = _fetch_models_sync()
-            assert len(result) == 2
+            assert len(result) == 1  # Only the curated one
             assert "anthropic/claude-sonnet-4" in result
-            assert "openai/gpt-4.1" in result
-            assert result["openai/gpt-4.1"].reasoning is False
+            assert "openai/gpt-4.1" not in result
+
+        # Reset
+        _mod._CURATED_IDS = []
 
     @pytest.mark.asyncio
     async def test_refresh_models(self) -> None:
-        """Test the async refresh_models function."""
+        import pilot_provider.openrouter as _mod
+
+        _mod._CURATED_IDS = ["anthropic/claude-sonnet-4"]
+        _mod._registry.clear()
+
         mock_response = json.dumps({"data": [_SAMPLE_API_MODEL]}).encode()
         with patch("urllib.request.urlopen") as mock_urlopen:
             mock_resp = MagicMock()
@@ -230,6 +273,10 @@ class TestModelRegistry:
             model = get_model("openrouter", "anthropic/claude-sonnet-4")
             assert model is not None
             assert model.reasoning is True
+
+        # Reset
+        _mod._CURATED_IDS = []
+        _mod._registry_loaded = False
 
 
 # ---------------------------------------------------------------------------
