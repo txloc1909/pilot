@@ -1,19 +1,38 @@
 """Agent loop core.
 
-Provides the async generator `agent_loop` that drives the conversation, dispatches
-tool calls, and yields `AgentEvent` objects. Currently a stub implementation.
+Provides ``agent_loop`` and ``agent_loop_continue`` async generators that drive
+the conversation, dispatch tool calls, and yield ``AgentEvent`` objects.
 """
 
-from typing import AsyncGenerator, List, Dict, Any
-from pydantic import BaseModel
+from pilot_core.agent_loop import agent_loop, agent_loop_continue
+from pilot_core.types import (
+    AfterToolCallContext,
+    AfterToolCallResult,
+    AgentContext,
+    AgentEvent,
+    AgentLoopConfig,
+    AgentMessage,
+    AgentTool,
+    AgentToolResult,
+    BeforeToolCallContext,
+    BeforeToolCallResult,
+    ShouldStopAfterTurnContext,
+    ToolExecutionMode,
+)
 
-
-class AgentEvent(BaseModel):
-    type: str
-    data: Dict[str, Any]
-
-
-async def agent_loop(messages: List[Dict[str, Any]], context: Dict[str, Any]) -> AsyncGenerator[AgentEvent, None]:
-    """Placeholder agent loop – yields a single dummy event.
-    """
-    yield AgentEvent(type="info", data={"msg": "agent loop stub"})
+__all__ = [
+    "agent_loop",
+    "agent_loop_continue",
+    "AfterToolCallContext",
+    "AfterToolCallResult",
+    "AgentContext",
+    "AgentEvent",
+    "AgentLoopConfig",
+    "AgentMessage",
+    "AgentTool",
+    "AgentToolResult",
+    "BeforeToolCallContext",
+    "BeforeToolCallResult",
+    "ShouldStopAfterTurnContext",
+    "ToolExecutionMode",
+]
