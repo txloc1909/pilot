@@ -16,25 +16,25 @@ a pilot equivalent (e.g., TUI features) are listed under **Gaps**.
 
 ## v0.72.0 → v0.72.1 (2026-05-03)
 
-**Status:** <synced / partial / not-started>
+**Status:** synced
 
 ### Agent loop (`packages/agent/src/`)
-- [ ] <change description> (commit abc1234)
+- [x] `agent.ts`: Changed default transport from `"sse"` to `"auto"` (036bde0a). Transport selection is an OpenAI Codex concern not relevant to pilot's OpenRouter-only provider. No porting needed.
 
 ### File tools (`packages/coding-agent/src/core/tools/`)
-- [ ] <change description>
+- No changes.
 
 ### Compaction (`packages/coding-agent/src/core/compaction/`)
-- [ ] <change description>
+- No changes.
 
 ### Session management (`agent-session.ts`)
-- [ ] <change description>
+- No changes.
 
 ### Types (`types.ts`)
-- [ ] <change description>
+- No changes.
 
 ### Extension API (`extension-loader.ts`)
-- [ ] <change description>
+- No changes.
 
 ### Gaps
-- <changes with no pilot equivalent — skipped intentionally>
+- `coding-agent/src/core/settings-manager.ts` had changes (4 lines, not a watched path). Skipped.
