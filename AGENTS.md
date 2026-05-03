@@ -24,7 +24,6 @@ src/
     ├── types.py       ← ProviderEvent, Model, Message, ContentBlock, Usage
     └── openrouter.py  ← stream() async generator, model registry
 tests/
-pi-mono/               ← pinned submodule (pi v0.72.1 upstream)
 ```
 
 ---

@@ -55,9 +55,10 @@ the Python harness, stop using pi and switch over entirely.
   not possible until the full port is done.
 
 **Version discipline:**
-- The `pi-mono` submodule must be pinned to the same version as the locally
-  installed `pi` binary at all times.
-- When upgrading `pi`, bump the submodule in the same commit.
+- The installed `pi` binary (global npm package) is the single source of truth.
+- When upgrading `pi`, review `packages/coding-agent/CHANGELOG.md` in the
+  upstream repo (https://github.com/badlogic/pi-mono) for changes that affect
+  the paths pilot cares about.
 - Document the pinned version in the repo README.
 
 ---
@@ -443,21 +444,16 @@ All from Components 1–9.
 
 ## Upstream Tracking
 
-The Python port lives in a separate repository. `pi-mono` is included as a git
-submodule pinned to a specific commit, giving an exact record of which upstream
-version each component was ported from and enabling deliberate, reviewed
-upgrades.
+There is no local copy of the pi source. The installed npm binary is the single
+source of truth. To review upstream changes during an upgrade, read the
+changelog on GitHub:
 
 ```
-my-agent/
-  pi-mono/        ← git submodule, pinned
-  src/
-    agent/
-    tools/
-    ...
+https://github.com/badlogic/pi-mono/blob/v<VERSION>/packages/coding-agent/CHANGELOG.md
 ```
 
-When checking for relevant upstream drift, watch only these paths:
+When checking for relevant upstream drift, watch only these paths in the
+upstream repo:
 
 ```
 packages/agent/src/
@@ -467,5 +463,4 @@ packages/coding-agent/src/core/agent-session.ts
 ```
 
 TUI, interactive mode, providers, and web-ui changes are not relevant to the
-port and can be ignored. Bump the submodule only after reviewing what changed
-in the paths above.
+port and can be ignored.

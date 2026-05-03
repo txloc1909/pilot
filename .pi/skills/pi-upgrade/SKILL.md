@@ -1,60 +1,44 @@
 ---
 name: pi-upgrade
-description: Upgrade the globally installed pi (coding agent) binary, update the pi-mono submodule, review upstream changes in watched paths, port relevant diffs to pilot's Python code, and commit the result. The pi-mono submodule and installed pi binary must always be pinned to the same version tag. Use when the user wants to upgrade pi, check for pi updates, sync pi-mono, or review upstream drift.
+description: Upgrade the globally installed pi (coding agent) binary, review upstream changes via the GitHub changelog, port relevant diffs to pilot's Python code, and commit the result. The installed pi binary is the single source of truth. Use when the user wants to upgrade pi, check for pi updates, or review upstream drift.
 ---
 
 # Pi Upgrade
 
-Upgrade pi (the installed npm package) alongside pilot (the Python port) during the interim period. This procedure keeps the pi-mono submodule pinned to the same version as the installed pi binary, reviews upstream changes in the paths pilot cares about, ports relevant diffs, and documents gaps.
+Upgrade pi (the installed npm package) alongside pilot (the Python port) during the interim period. The installed `pi` binary is the single source of truth — there is no local copy of the pi source. Upstream changes are reviewed via the changelog on GitHub.
 
 **Working directory:** `/var/home/loctran/personal/pilot` (the pilot repo root)
-**Pi-mono submodule:** `pi-mono/` (git submodule of badlogic/pi-mono)
 
 ---
 
 ## Step 1: Inventory
 
-Run these commands in the pilot repo root to establish current state:
-
 ```bash
-# 1. Installed pi version (global npm package)
-echo "pi: $(npm ls -g @mariozechner/pi-coding-agent --depth=0 2>/dev/null | grep -oP '\d+\.\d+\.\d+')"
-
-# 2. pi-mono submodule pinned version
-echo "submodule: $(cd pi-mono && git describe --tags 2>/dev/null || echo 'no tag')"
-
-# 3. Latest available on npm
+echo "pi: $(npm ls -g @mariozechner/pi-coding-agent --depth=0 2>/dev/null | awk -F@ '/pi-coding-agent/ {print $NF}')"
 echo "latest: $(npm view @mariozechner/pi-coding-agent version 2>/dev/null)"
 ```
 
-If installed pi version matches submodule version, they are in sync. If not, the last upgrade was incomplete — note the gap.
-
-If installed pi version already matches latest available, no upgrade is needed — stop here unless the user wants to check for drift anyway.
+If installed version matches latest, no upgrade needed — stop here unless checking for drift anyway.
 
 ---
 
-## Step 2: Fetch upstream tags
+## Step 2: Review upstream changelog
 
-```bash
-cd pi-mono && git fetch --tags origin
+Read the CHANGELOG for the target version on GitHub:
+
+```
+https://github.com/badlogic/pi-mono/blob/v<NEXT>/packages/coding-agent/CHANGELOG.md
 ```
 
----
+Focus on the section for `v<NEXT>` (the new version). Also check `packages/agent/CHANGELOG.md`:
 
-## Step 3: Diff upstream watched paths
-
-Run the diff script to see what changed between the old version and the new version in the paths pilot cares about:
-
-```bash
-./scripts/diff-upstream.sh \
-  --repo pi-mono \
-  --from v<CURRENT> \
-  --to v<NEXT>
+```
+https://github.com/badlogic/pi-mono/blob/v<NEXT>/packages/agent/CHANGELOG.md
 ```
 
 This compares the following watched paths (from PYTHON_PORT.md):
 
-| pi-mono path | Pilot equivalent | Port status |
+| Upstream path | Pilot equivalent | Port status |
 |---|---|---|
 | `packages/agent/src/` | `src/pilot_core/agent_loop.py` | Ported |
 | `packages/coding-agent/src/core/tools/` | `src/pilot/tools/` | Stubs |
@@ -64,60 +48,61 @@ This compares the following watched paths (from PYTHON_PORT.md):
 
 Plus secondary paths that affect the TS extension shim:
 
-| pi-mono path | Purpose |
+| Upstream path | Purpose |
 |---|---|
 | `packages/coding-agent/src/core/extension-loader.ts` | May affect `harness.ts` extension API |
 | `packages/coding-agent/src/core/provider-display-names.ts` | Affects `harness.ts` if provider naming changed |
 
-Also watch the CHANGELOG for breaking changes:
+Look for keywords in the changelog:
+- **"Breaking Changes"** section — always check this first
+- Agent loop changes → `packages/agent/CHANGELOG.md`
+- Tool changes → `packages/coding-agent/CHANGELOG.md` under "Fixed" sections
+- Compaction/session changes → `packages/coding-agent/CHANGELOG.md`
+- Extension API changes → `packages/coding-agent/CHANGELOG.md` under "Added" (new API features) or "Fixed" (API behavior)
 
-```bash
-cd pi-mono && git diff --stat v<CURRENT>..v<NEXT> -- packages/coding-agent/CHANGELOG.md
-cd pi-mono && git log v<CURRENT>..v<NEXT> --oneline -- packages/coding-agent/CHANGELOG.md
-```
-
-If no watched paths changed and the changelog has nothing relevant, this is a non-impacting patch — go to Apply Upgrade directly.
+If the changelog has nothing relevant to watched paths, this is a non-impacting patch — go to Apply Upgrade directly.
 
 ---
 
-## Step 4: Impact analysis
+## Step 3: Impact analysis
 
-For each watched path that has changes:
+For each line item in the changelog that affects a watched path:
 
-### 4a. Agent loop (`packages/agent/src/`)
+### 3a. Agent loop (`packages/agent/src/`)
 
-Read the full diff:
+If `packages/agent/CHANGELOG.md` mentions changes:
+- Logic (conditions, loops, hook semantics) → port to `src/pilot_core/agent_loop.py`
+- Type changes → port to `src/pilot_core/types.py`
+- New features → assess if pilot needs them; if not, document gap
 
-```bash
-cd pi-mono && git diff v<CURRENT>..v<NEXT> -- packages/agent/src/
+To read the actual source diff for a specific commit:
+```
+https://github.com/badlogic/pi-mono/commit/<HASH>
+```
+Or browse the full file at the target tag:
+```
+https://github.com/badlogic/pi-mono/blob/v<NEXT>/packages/agent/src/agent-loop.ts
 ```
 
-Map each change to `src/pilot_core/agent_loop.py`:
-- Logic changes (conditions, loops, hook semantics) → port to Python
-- Type changes → port to `src/pilot_core/types.py`
-- New features → assess if pilot needs them; if the pilot equivalent doesn't exist yet, document gap
+### 3b. File tools (`packages/coding-agent/src/core/tools/`)
 
-### 4b. File tools (`packages/coding-agent/src/core/tools/`)
+Changelog mentions fixes or changes to edit/write/read/bash/grep/find/ls -> map to `src/pilot/tools/*.py`. Since tools are stubs, most changes won't need immediate porting — document in gap log.
 
-Read the diff. Map to `src/pilot/tools/*.py`. Since tools are currently stubs, most upstream changes won't need immediate porting — but document them in the gap log.
+### 3c. Compaction / Session
 
-### 4c. Compaction / Session (`packages/coding-agent/src/core/compaction/`, `agent-session.ts`)
+Both are stubs. Read the changelog for awareness. Document any breaking changes in session JSONL format or compaction interface.
 
-Both are stubs in pilot. Read the diff for awareness. Document any breaking changes in the session JSONL format or compaction interface.
+### 3d. Extension API
 
-### 4d. Extension API (`packages/coding-agent/src/core/extension-loader.ts`)
+If `packages/coding-agent/CHANGELOG.md` mentions extension API changes, the TS shim `harness.ts` may need updating. Read the relevant commit diff on GitHub.
 
-If the extension API changed (tool registration interface, event hooks, `ExtensionAPI` type), the TS shim `harness.ts` may need updating. Read the diff carefully.
-
-### 4e. Gap documentation
+### 3e. Gap documentation
 
 For any watched-path change that has no pilot equivalent to port into, append an entry to `references/port-deltas.md`.
 
 ---
 
-## Step 5: Apply upgrade
-
-### 5a. Upgrade pi binary
+## Step 4: Apply upgrade
 
 ```bash
 npm install -g @mariozechner/pi-coding-agent@<NEXT_VERSION>
@@ -126,24 +111,18 @@ npm install -g @mariozechner/pi-coding-agent@<NEXT_VERSION>
 Verify:
 
 ```bash
-echo "installed: $(npm ls -g @mariozechner/pi-coding-agent --depth=0 2>/dev/null | grep -oP '\d+\.\d+\.\d+')"
-```
-
-### 5b. Update pi-mono submodule
-
-```bash
-cd pi-mono && git checkout v<NEXT_VERSION>
+echo "installed: $(npm ls -g @mariozechner/pi-coding-agent --depth=0 2>/dev/null | awk -F@ '/pi-coding-agent/ {print $NF}')"
 ```
 
 ---
 
-## Step 6: Port changes to pilot
+## Step 5: Port changes to pilot
 
-For each change identified in Step 4 that has a pilot equivalent:
+For each change identified in Step 3 that has a pilot equivalent:
 
-1. Read the TS diff: `git diff v<CURRENT>..v<NEXT> -- <path>`
+1. Read the source diff on GitHub at `https://github.com/badlogic/pi-mono/commit/<HASH>`
 2. Edit the corresponding pilot Python file
-3. Add a comment referencing the upstream commit: `# ported from pi-mono <SHORT_HASH>: <description>`
+3. Add a comment referencing the upstream commit: `# ported from pi-mono commit <HASH>: <description>`
 
 ### Specific components:
 
@@ -191,9 +170,9 @@ After porting, update `references/port-deltas.md`:
 
 ---
 
-## Step 7: Verify
+## Step 6: Verify
 
-### 7a. Python tests
+### 6a. Python tests
 
 ```bash
 uv run pytest
@@ -201,15 +180,13 @@ uv run pytest
 
 If any tests fail, fix before proceeding.
 
-### 7b. JS extension tests
+### 6b. JS extension tests
 
 ```bash
 make test-js
 ```
 
-### 7c. Smoke test the TS shim
-
-Run a quick sanity check to ensure pi loads with the TS extension:
+### 6c. Smoke test
 
 ```bash
 echo "hello" | pi -p "what version of pi are you?" --no-skills 2>&1 | head -3
@@ -217,7 +194,7 @@ echo "hello" | pi -p "what version of pi are you?" --no-skills 2>&1 | head -3
 
 ---
 
-## Step 8: Commit
+## Step 7: Commit
 
 ```bash
 git add -A
@@ -233,21 +210,18 @@ Ran on 2026-05-03:
 ```bash
 # Inventory
 pi: 0.72.0
-submodule: 0.72.0
 latest: 0.72.1
 
-# Fetch
-cd pi-mono && git fetch --tags origin
+# Read changelog on GitHub
+# https://github.com/badlogic/pi-mono/blob/v0.72.1/packages/coding-agent/CHANGELOG.md
+# → Only "Fixed the default transport setting to use auto"
+# → No changes in watched paths (agent loop, tools, compaction, session, extension API)
 
-# Diff watched paths
-# Only packages/agent/src/agent.ts had a 1-line change
-# No changes in tools/, compaction/, agent-session.ts, extension-loader.ts
-
-# Impact: trivial patch (agent.ts version bump only)
-# → Applied upgrade directly, synced submodule, no porting needed
+# Impact: non-impacting patch — agent.ts transport default change only
+# No porting needed
 
 # Apply
 npm install -g @mariozechner/pi-coding-agent@0.72.1
-cd pi-mono && git checkout v0.72.1
+git add -A
 git commit -m "chore: upgrade pi to v0.72.1, sync pilot"
 ```
