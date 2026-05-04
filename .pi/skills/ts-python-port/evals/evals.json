@@ -1,0 +1,23 @@
+{
+  "skill_name": "ts-python-port",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I'm porting pi's output truncation utility to pilot. It's not a user-facing tool — it's a shared helper used internally by bash, read, and grep tools to truncate output by line count or byte count. The pi source types are at ~/.nvm/versions/node/v24.14.1/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/tools/truncate.d.ts. Port the TruncationResult interface and the truncateHead, truncateTail, truncateLine functions to Python. Use pydantic for the result type. Save as src/pilot/tools/truncate.py so other tools can import truncate_head, truncate_tail from it.",
+      "expected_output": "Created src/pilot/tools/truncate.py with TruncationResult pydantic model, truncate_head/truncate_tail/truncate_line functions, and DEFAULT_MAX_LINES/DEFAULT_MAX_BYTES constants",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "I need to rewrite pilot's bash tool stub at src/pilot/tools/bash.py to match pi's capabilities. Look at pi's bash types at ~/.nvm/versions/node/v24.14.1/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/tools/bash.d.ts and the truncation utility at dist/core/tools/truncate.d.ts. The Python version should: (1) handle timeouts with asyncio.wait_for and kill the process on timeout, (2) truncate output using truncate_tail from the truncate utility module, (3) define a BashOperations protocol that lets callers swap in remote execution (SSH etc.), and (4) return a dict with stdout, stderr, exit_code, and truncation metadata. Update src/pilot/tools/bash.py.",
+      "expected_output": "Updated src/pilot/tools/bash.py with timeout handling, truncation via truncate_tail, BashOperations protocol, and LocalBashOperations default implementation",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I'm porting pi's session entry types to pilot. The pi types are defined at ~/.nvm/versions/node/v24.14.1/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/session-manager.d.ts — look at the SessionEntry union (all 9 entry types: SessionMessageEntry, ThinkingLevelChangeEntry, ModelChangeEntry, CompactionEntry, BranchSummaryEntry, CustomEntry, LabelEntry, SessionInfoEntry, CustomMessageEntry) plus SessionHeader, SessionContext, and the helper function buildSessionContext. Port these as pydantic models with proper discriminated unions. Save to src/pilot/session/types.py. Don't try to port the SessionManager class itself — just the data types and pure helper functions.",
+      "expected_output": "Created src/pilot/session/types.py with all 9 SessionEntry types as discriminated union, SessionHeader, SessionContext models, and build_session_context helper function",
+      "files": []
+    }
+  ]
+}
