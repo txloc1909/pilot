@@ -1,26 +1,62 @@
-"""Write tool stub.
+"""Write tool — Write content to a file.
 
-Implements an async ``execute`` that writes content to a file, creating the file
-if necessary. Returns a diff of the change (stubbed as empty string).
+Creates the file if it doesn't exist, overwrites if it does. Automatically
+creates parent directories.
+
+Port of pi's core/tools/write.ts
 """
 
-import asyncio
-from pathlib import Path
-from typing import Dict, Any
+from __future__ import annotations
+
+import os
+from typing import Any, Dict
+
+from .file_mutation_queue import with_file_mutation_queue
+from .path_utils import resolve_to_cwd
 
 
 async def execute(input: Dict[str, Any], cwd: str) -> Dict[str, Any]:
-    path = input.get("path")
+    """Write content to a file.
+
+    Args:
+        input: Expected keys: ``path`` (str), ``content`` (str).
+        cwd: Working directory for relative path resolution.
+
+    Returns:
+        Dict with content and optionally a diff in details.
+    """
+    raw_path = input.get("path")
     content = input.get("content", "")
-    if not path:
-        return {"error": "No path provided"}
-    full_path = Path(cwd) / path
-    try:
-        old_exists = full_path.exists()
-        old_text = full_path.read_text() if old_exists else ""
-        full_path.parent.mkdir(parents=True, exist_ok=True)
-        full_path.write_text(content)
-        # Diff generation could be added; placeholder empty diff.
-        return {"diff": ""}
-    except Exception as e:
-        return {"error": str(e)}
+
+    if not raw_path:
+        return {
+            "content": [{"type": "text", "text": "No path provided"}],
+            "is_error": True,
+        }
+
+    if content is None:
+        content = ""
+
+    absolute_path = resolve_to_cwd(raw_path, cwd)
+    directory = os.path.dirname(absolute_path)
+
+    async def _write() -> Dict[str, Any]:
+        try:
+            # Create parent directories if needed
+            os.makedirs(directory, exist_ok=True)
+
+            # Write the file contents
+            with open(absolute_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            return {
+                "content": [{"type": "text", "text": f"Successfully wrote {len(content)} bytes to {raw_path}"}],
+                "details": None,
+            }
+        except Exception as e:
+            return {
+                "content": [{"type": "text", "text": str(e)}],
+                "is_error": True,
+            }
+
+    return await with_file_mutation_queue(absolute_path, _write)
