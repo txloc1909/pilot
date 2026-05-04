@@ -12,8 +12,8 @@ Track changes between pi-mono (upstream TypeScript) and pilot (Python port).
 - [x] No changes in v0.73.0 — `agent/CHANGELOG.md` is empty for this version
 
 ### File tools (`packages/coding-agent/src/core/tools/`)
-- [ ] **Incremental bash output streaming** — Bash tool output now streams while commands run instead of waiting for completion. Pilot has stub tools only, no porting needed.
-- [ ] **Compact read rendering** — Read output for docs/context/skills is collapsed by default. Pilot has stub tools only, no porting needed.
+- [x] **Incremental bash output streaming** — Bash tool output now streams while commands run instead of waiting for completion. ✅ **Ported**: Implemented `OutputAccumulator` class and throttled update mechanism (200ms). Ported from `packages/coding-agent/src/core/tools/output-accumulator.ts` and `bash.ts`.
+- [ ] **Compact read rendering** — Read output for docs/context/skills is collapsed by default. This is a UI/rendering change in interactive mode, not a tool implementation change.
 
 ### Provider/Model changes
 - [ ] **Xiaomi MiMo API billing** — Switched from Token Plan to API billing endpoint. Provider-specific change, not core logic.

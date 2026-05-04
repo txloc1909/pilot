@@ -71,7 +71,13 @@ def _wrap_tool(
         # Build the input dict the module-level execute expects
         input_dict = params if isinstance(params, dict) else {}
 
-        result = await raw_execute(input_dict, cwd)
+        # Check if the raw execute function supports on_update parameter
+        import inspect
+        sig = inspect.signature(raw_execute)
+        if 'on_update' in sig.parameters:
+            result = await raw_execute(input_dict, cwd, on_update=on_update)
+        else:
+            result = await raw_execute(input_dict, cwd)
 
         content = result.get("content", [{"type": "text", "text": ""}])
         details = result.get("details")
