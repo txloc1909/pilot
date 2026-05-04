@@ -735,6 +735,22 @@ class SessionManager:
         """Build the session context (what gets sent to the LLM)."""
         return build_session_context(self.get_entries(), self._leaf_id, self._by_id)
 
+    def check_compaction_needed(self, context_window: int, settings: Any) -> bool:
+        """Check if compaction is needed based on context window usage.
+
+        Args:
+            context_window: Maximum tokens the model can handle
+            settings: CompactionSettings with enabled, reserve_tokens, keep_recent_tokens
+
+        Returns:
+            True if compaction should be triggered
+        """
+        from pilot.compaction import estimate_context_tokens, should_compact
+
+        context = self.build_session_context()
+        estimate = estimate_context_tokens(context.messages)
+        return should_compact(estimate.tokens, context_window, settings)
+
     def get_header(self) -> Optional[SessionHeader]:
         for entry in self._file_entries:
             if entry.get("type") == "session":

@@ -48,7 +48,15 @@ class ToolCall(BaseModel):
     thought_signature: Optional[str] = None
 
 
-ContentBlock = Union[TextContent, ThinkingContent, ImageContent, ToolCall]
+class ToolCallContent(BaseModel):
+    """Tool call content block in assistant message."""
+    type: Literal["toolCall"] = "toolCall"
+    id: str = ""
+    name: str
+    arguments: Optional[Dict[str, Any]] = None
+
+
+ContentBlock = Union[TextContent, ThinkingContent, ImageContent, ToolCall, ToolCallContent]
 
 
 # ---------------------------------------------------------------------------
@@ -108,7 +116,16 @@ class ToolResultMessage(BaseModel):
     timestamp: int  # Unix ms
 
 
-Message = Union[UserMessage, AssistantMessage, ToolResultMessage]
+class BashExecutionMessage(BaseModel):
+    """Message representing a bash command execution."""
+    role: Literal["bashExecution"] = "bashExecution"
+    command: str
+    output: str
+    exit_code: int
+    timestamp: int  # Unix ms
+
+
+Message = Union[UserMessage, AssistantMessage, ToolResultMessage, BashExecutionMessage]
 
 
 # ---------------------------------------------------------------------------
