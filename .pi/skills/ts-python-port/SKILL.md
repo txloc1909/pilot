@@ -2,24 +2,40 @@
 name: ts-python-port
 description: >
   Port TypeScript code to idiomatic Python. Use this skill whenever the user asks
-  to port, translate, convert, or rewrite TypeScript/JavaScript code to Python,
-  especially for porting pi, pilot, or any agent/core LLM tooling infrastructure.
-  Also use this skill when the user mentions "pi → pilot port", "TS→Python porting",
-  "translate TS to Python", or "Python equivalent of TypeScript code".
-  This skill covers mechanical TypeScript-to-Python translation patterns, async
-  code flow adaptation, type system mapping (TypeBox → Pydantic / jsonschema),
-  npm dependency replacement with Python equivalents, and structural code
-  organization differences. If the user asks about porting any TypeScript library,
-  utility, or system to Python — even if they don't explicitly name pi or pilot —
-  you should still consult this skill for the general patterns.
-  IMPORTANT: Use this skill even if the user only mentions porting in passing,
-  or asks a question that implies translation between TS and Python.
+  to port, translate, convert, or rewrite TypeScript/JavaScript code to Python.
+  Triggers on: "pi → pilot port", "TS→Python porting", "translate TS to Python",
+  or "Python equivalent of TypeScript code". Covers async patterns, type mapping
+  (TypeBox → Pydantic), npm→Python dependency replacement, and file organization.
+  For complex tasks, uses plan mode with numbered plans and [DONE:n] tracking.
 ---
 
 # TS → Python Porting Skill
 
 This skill provides a structured methodology for porting TypeScript code to Python,
 with specific guidance for porting pi's components to pilot (the Python port).
+
+## Plan Mode Usage
+
+This skill works best in plan mode. When you begin a porting task:
+
+1. **Enable plan mode** using `/plan` or `--plan` flag
+2. **Create a numbered plan** with a `Plan:` header showing all steps
+3. **Execute step-by-step** with progress tracking using `[DONE:n]` markers
+4. **Follow the plan execution pattern** for multi-file porting tasks
+
+**Important**: Use plan mode when porting multiple files or complex components.
+This ensures safe, structured execution with explicit progress tracking.
+
+### When to Use Plan Mode vs Regular Mode
+
+| Use Plan Mode | Use Regular Mode |
+|---|---|
+| Porting multiple files or a full component | Porting a single simple file |
+| Complex type hierarchies with many interfaces | Simple type definitions |
+| Requires careful step-by-step execution | Quick one-off translation |
+| User asks for structured approach | User wants immediate results |
+| Need progress tracking and rollback safety | Simple, low-risk changes |
+
 Start by reading the relevant source code before proposing any translation.
 
 ## Core Porting Patterns
@@ -237,6 +253,29 @@ ProviderEvent = Union[TextEvent, ToolCallEvent, UsageEvent, StopEvent, ErrorEven
 
 When the user asks you to port a specific component, follow these steps:
 
+### Step 0: Enable Plan Mode (for complex tasks)
+
+For multi-file or complex porting tasks, enable plan mode first:
+
+```
+/plan
+```
+
+Then create a numbered plan with a `Plan:` header:
+
+```
+Plan:
+1. Read and understand the TypeScript source files
+2. Map interfaces/types to Pydantic models
+3. Map functions to async Python functions
+4. Identify and map npm dependencies to Python equivalents
+5. Write the Python implementation files
+6. Write tests for the new Python code
+7. Run tests and fix any issues
+```
+
+During execution, mark completed steps with `[DONE:n]` markers.
+
 ### Step 1: Understand the source
 
 1. **Find the TS source**: Look in pi's npm package at
@@ -256,6 +295,13 @@ When the user asks you to port a specific component, follow these steps:
    to understand how the existing Python code is tested and what test patterns
    are used.
 
+**Mark as done**: After understanding the source, use `[DONE:1]` to indicate completion.
+
+**Note**: When porting context compaction, read:
+- `/var/home/loctran/.nvm/versions/node/v24.14.1/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/compaction/compaction.d.ts` - types
+- `/var/home/loctran/.nvm/versions/node/v24.14.1/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/compaction/compaction.js` - implementation
+- `/var/home/loctran/.nvm/versions/node/v24.14.1/lib/node_modules/@mariozechner/pi-coding-agent/dist/core/compaction/utils.js` - utilities
+
 ### Step 2: Plan the translation
 
 For each TypeScript file being ported:
@@ -267,6 +313,8 @@ For each TypeScript file being ported:
    `path`) and map to Python (`bytes`, `pathlib`, `subprocess`, `os.path`).
 5. **Identify TS-only patterns** (`AbortController`, `EventStream`, `Proxy`)
    and map to Python equivalents.
+
+**Mark as done**: After planning, use `[DONE:2]` to indicate completion.
 
 ### Step 3: Write the Python code
 
@@ -284,6 +332,8 @@ Follow these conventions:
 7. **Error handling**: Use specific exception types. Wrap `jsonschema` validation
    errors in `ValueError` with descriptive messages.
 
+**Mark as done**: After writing code, use `[DONE:3]` to indicate completion.
+
 ### Step 4: Write tests
 
 1. Follow the pattern in `tests/test_agent_loop.py`:
@@ -298,11 +348,15 @@ Follow these conventions:
    - Test cancellation/abort signals
    - For tools: test with temp directory fixtures
 
+**Mark as done**: After writing tests, use `[DONE:4]` to indicate completion.
+
 ### Step 5: Run and fix
 
 1. Run `uv run pytest tests/ -v` to see test results
 2. Run `uv run ruff check src/` for linting
 3. Fix any issues iteratively
+
+**Mark as done**: After running tests and fixing issues, use `[DONE:5]` to indicate completion.
 
 ## pi → pilot Specific Guidance
 
@@ -509,3 +563,34 @@ class SessionMessageEntry(SessionEntryBase):
     type: Literal["message"] = "message"
     message: AgentMessage  # Union[UserMessage, AssistantMessage, ToolResultMessage]
 ```
+
+### Example 4: Using Plan Mode for Multi-File Porting
+
+When porting a complex component with multiple files, use plan mode:
+
+```
+Plan:
+1. Read core/tools/truncate.ts and core/tools/edit-diff.ts
+2. Map TruncationResult and EditDiff interfaces to Pydantic models
+3. Port truncate_head() and truncate_tail() functions
+4. Port the diff computation logic
+5. Write tests for truncation and diff functions
+6. Run tests and fix any issues
+```
+
+Execute each step, marking completion with `[DONE:n]`:
+
+```
+[DONE:1] Read and analyzed core/tools/truncate.ts and core/tools/edit-diff.ts
+[DONE:2] Created Pydantic models: TruncationResult, EditDiffOptions
+[DONE:3] Implemented truncate_head() and truncate_tail() functions
+[DONE:4] Ported diff computation using Python's difflib
+[DONE:5] Wrote comprehensive tests with pytest.mark.asyncio
+[DONE:6] All tests passing, code formatted with ruff
+```
+
+This approach ensures:
+- Safe, structured execution with explicit progress
+- Easy rollback if a step fails
+- Clear documentation of what was accomplished
+- Progress tracking visible to the user
