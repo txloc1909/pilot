@@ -31,6 +31,8 @@ tests/
 ## Conventions
 
 - **`pytest`** + **`pytest-asyncio`** for tests.
+- Each test file corresponds to a module. Within a test file, group related
+  test cases by class.
 - **`pydantic`** for all types (provider types → `pilot_provider/types.py`,
   agent types → `pilot_core/types.py`).
 - Tool signature: `async def execute(input: dict, cwd: str) -> dict`.
