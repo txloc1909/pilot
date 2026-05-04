@@ -13,6 +13,7 @@ Track changes between pi-mono (upstream TypeScript) and pilot (Python port).
 
 ### File tools (`packages/coding-agent/src/core/tools/`)
 - [x] **Incremental bash output streaming** — Bash tool output now streams while commands run instead of waiting for completion. ✅ **Ported**: Implemented `OutputAccumulator` class and throttled update mechanism (200ms). Ported from `packages/coding-agent/src/core/tools/output-accumulator.ts` and `bash.ts`.
+  - Tests: `tests/test_output_accumulator.py` (12 tests), `tests/test_bash_incremental.py` (7 tests)
 - [ ] **Compact read rendering** — Read output for docs/context/skills is collapsed by default. This is a UI/rendering change in interactive mode, not a tool implementation change.
 
 ### Provider/Model changes
