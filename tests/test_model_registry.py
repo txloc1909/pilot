@@ -1,7 +1,6 @@
-"""Tests for model registry (minimal version)."""
+"""Tests for model registry with class-based grouping and fixtures."""
 
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -10,27 +9,44 @@ from pilot.auth.storage import AuthStorage
 from pilot.models.registry import ModelRegistry
 
 
-def test_model_registry_in_memory():
-    """Test in-memory model registry."""
-    auth_storage = AuthStorage.in_memory()
-    registry = ModelRegistry.in_memory(auth_storage)
+class TestModelRegistryCreation:
+    """Tests for creating model registry instances."""
 
-    # Should have no custom models initially
-    all_models = registry.get_all()
-    assert len(all_models) == 0
+    def test_in_memory_creation(self, auth_storage):
+        """Test creating an in-memory model registry."""
+        registry = ModelRegistry.in_memory(auth_storage)
 
-    # Find should return None for non-existent model
-    model = registry.find("openai", "nonexistent-model")
-    assert model is None
+        # Should have no custom models initially
+        all_models = registry.get_all()
+        assert len(all_models) == 0
+
+        # Should have no error
+        assert registry.get_error() is None
+
+    def test_create_with_models_json(self, temp_dir, auth_storage):
+        """Test creating registry with a models.json file."""
+        models_path = temp_dir / "models.json"
+        models_path.write_text(json.dumps({
+            "providers": {
+                "test": {
+                    "baseUrl": "http://test.com",
+                    "apiKey": "test-key",
+                    "models": [{"id": "test/model-1", "name": "Test Model 1"}]
+                }
+            }
+        }))
+
+        registry = ModelRegistry.create(auth_storage, str(models_path))
+        assert len(registry.get_all()) == 1
 
 
-def test_model_registry_load_custom_models():
-    """Test loading custom models from models.json."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        auth_storage = AuthStorage.in_memory()
-        models_path = Path(tmpdir) / "models.json"
+class TestModelRegistryCustomModels:
+    """Tests for custom model loading from models.json."""
 
-        # Write a models.json with custom models
+    def test_load_custom_models(self, temp_dir, auth_storage):
+        """Test loading custom models from models.json."""
+        models_path = temp_dir / "models.json"
+
         custom_config = {
             "providers": {
                 "custom": {
@@ -42,7 +58,7 @@ def test_model_registry_load_custom_models():
                             "name": "Custom Model 1",
                             "reasoning": False,
                             "input": ["text"],
-                            "cost": {"input": 0.5, "output": 1.0, "cacheRead": 0, "cacheWrite": 0},
+                            "cost": {"input": 0.5, "output": 1.0},
                             "contextWindow": 8192,
                             "maxTokens": 2048,
                         }
@@ -64,12 +80,9 @@ def test_model_registry_load_custom_models():
         # Check API key was set as runtime override
         assert auth_storage.has_auth("custom")
 
-
-def test_model_registry_find():
-    """Test finding models."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        auth_storage = AuthStorage.in_memory()
-        models_path = Path(tmpdir) / "models.json"
+    def test_find_model(self, temp_dir, auth_storage):
+        """Test finding models by provider and ID."""
+        models_path = temp_dir / "models.json"
 
         custom_config = {
             "providers": {
@@ -96,86 +109,132 @@ def test_model_registry_find():
         assert model is None
 
 
-def test_model_registry_auth_status():
-    """Test auth status methods."""
-    auth_storage = AuthStorage.in_memory()
-    registry = ModelRegistry.in_memory(auth_storage)
+class TestModelRegistryAuth:
+    """Tests for auth-related model registry methods."""
 
-    # Check auth status for a provider
-    status = registry.get_provider_auth_status("openai")
-    assert status is not None
+    def test_has_configured_auth(self, model_registry):
+        """Test auth check for models."""
+        from pilot_provider.types import Model
+
+        mock_model = Model(
+            id="test/model",
+            name="Test Model",
+            api="openai-completions",
+            provider="nonexistent-provider",
+            base_url="",
+            reasoning=False,
+            input_types=["text"],
+        )
+
+        # Should return False for unknown provider
+        assert not model_registry.has_configured_auth(mock_model)
+
+    def test_get_provider_auth_status(self, model_registry):
+        """Test getting provider auth status."""
+        status = model_registry.get_provider_auth_status("openai")
+        assert status is not None
 
 
-def test_model_registry_register_provider():
-    """Test dynamic provider registration."""
-    auth_storage = AuthStorage.in_memory()
-    registry = ModelRegistry.in_memory(auth_storage)
+class TestModelRegistryProviderRegistration:
+    """Tests for dynamic provider registration."""
 
-    # Register a new provider
-    registry.register_provider(
-        "test-provider",
-        {"baseUrl": "http://test.com", "apiKey": "test-key"}
-    )
+    def test_register_provider(self, auth_storage):
+        """Test registering a new provider."""
+        registry = ModelRegistry.in_memory(auth_storage)
 
-    # Check API key was set
-    assert auth_storage.has_auth("test-provider")
+        # Register a new provider
+        registry.register_provider(
+            "test-provider",
+            {"baseUrl": "http://test.com", "apiKey": "test-key"}
+        )
+
+        # Check API key was set
+        assert auth_storage.has_auth("test-provider")
+
+    def test_unregister_provider(self, auth_storage):
+        """Test unregistering a provider."""
+        registry = ModelRegistry.in_memory(auth_storage)
+
+        # Register then unregister
+        registry.register_provider("temp-provider", {"apiKey": "key"})
+        assert "temp-provider" in auth_storage._runtime_overrides
+
+        registry.unregister_provider("temp-provider")
+        # Provider config should be removed (though runtime override remains)
 
 
-def test_model_registry_error_handling():
-    """Test error handling for invalid models.json."""
-    with tempfile.TemporaryDirectory() as tmpdir:
-        auth_storage = AuthStorage.in_memory()
-        models_path = Path(tmpdir) / "models.json"
+class TestModelRegistryErrorHandling:
+    """Tests for error handling."""
+
+    def test_invalid_models_json(self, temp_dir, auth_storage):
+        """Test error handling for invalid models.json."""
+        models_path = temp_dir / "models.json"
         models_path.write_text("invalid json")
 
         registry = ModelRegistry.create(auth_storage, str(models_path))
         error = registry.get_error()
 
-        # Should have an error from loading invalid JSON
         assert error is not None
+        assert "Failed to load" in error
+
+    def test_missing_models_json(self, temp_dir, auth_storage):
+        """Test registry creation with missing models.json."""
+        models_path = temp_dir / "models.json"
+
+        registry = ModelRegistry.create(auth_storage, str(models_path))
+        assert registry.get_error() is None
+        assert len(registry.get_all()) == 0
 
 
-def test_model_registry_has_configured_auth():
-    """Test auth check for models."""
-    auth_storage = AuthStorage.in_memory()
-    registry = ModelRegistry.in_memory(auth_storage)
+class TestModelRegistryApiKeyResolution:
+    """Tests for API key resolution."""
 
-    # Create a mock model (not from registry, just for testing)
-    from pilot_provider.types import Model
+    @pytest.mark.asyncio
+    async def test_get_api_key_and_headers(self, auth_storage):
+        """Test getting API key and headers for a model."""
+        registry = ModelRegistry.in_memory(auth_storage)
 
-    mock_model = Model(
-        id="test/model",
-        name="Test Model",
-        api="openai-completions",
-        provider="nonexistent-provider",
-        base_url="",
-        reasoning=False,
-        input_types=["text"],
-    )
+        from pilot_provider.types import Model
 
-    # Should return False for unknown provider
-    assert not registry.has_configured_auth(mock_model)
+        mock_model = Model(
+            id="test/model",
+            name="Test Model",
+            api="openai-completions",
+            provider="openai",
+            base_url="",
+            reasoning=False,
+            input_types=["text"],
+        )
 
+        result = await registry.get_api_key_and_headers(mock_model)
 
-@pytest.mark.asyncio
-async def test_model_registry_get_api_key_and_headers():
-    """Test getting API key and headers for a model."""
-    auth_storage = AuthStorage.in_memory()
-    registry = ModelRegistry.in_memory(auth_storage)
+        assert "api_key" in result
+        assert "headers" in result
 
-    from pilot_provider.types import Model
+    @pytest.mark.asyncio
+    async def test_get_api_key_for_provider(self, auth_storage):
+        """Test getting API key for a provider."""
+        registry = ModelRegistry.in_memory(auth_storage)
 
-    mock_model = Model(
-        id="test/model",
-        name="Test Model",
-        api="openai-completions",
-        provider="openai",
-        base_url="",
-        reasoning=False,
-        input_types=["text"],
-    )
+        # No key configured
+        key = await registry.get_api_key_for_provider("openai")
+        assert key is None
 
-    result = await registry.get_api_key_and_headers(mock_model)
+    def test_is_using_oauth(self, auth_storage):
+        """Test checking if model uses OAuth."""
+        registry = ModelRegistry.in_memory(auth_storage)
 
-    assert "api_key" in result
-    assert "headers" in result
+        from pilot_provider.types import Model
+
+        mock_model = Model(
+            id="test/model",
+            name="Test Model",
+            api="openai-completions",
+            provider="openai",
+            base_url="",
+            reasoning=False,
+            input_types=["text"],
+        )
+
+        # Should return False (no OAuth configured)
+        assert not registry.is_using_oauth(mock_model)

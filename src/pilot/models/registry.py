@@ -168,9 +168,9 @@ class ModelRegistry:
         """Return auth status for a provider."""
         return self._auth_storage.get_auth_status(provider)
 
-    def get_api_key_for_provider(self, provider: str) -> Optional[str]:
-        """Get API key for a provider (sync)."""
-        return self._auth_storage.get_api_key(provider)
+    async def get_api_key_for_provider(self, provider: str) -> Optional[str]:
+        """Get API key for a provider."""
+        return await self._auth_storage.get_api_key(provider)
 
     def is_using_oauth(self, model: Model) -> bool:
         """Check if a model is using OAuth credentials."""
