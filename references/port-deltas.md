@@ -28,7 +28,6 @@ Track changes between pi-mono (upstream TypeScript) and pilot (Python port).
 - [ ] No changes in v0.73.0
 
 ### Gaps
-- Pilot tools are stubs (bash, read, edit, etc.) — upstream tool changes don't require porting
 - Pilot session is stub-only — upstream session changes don't require porting
 - Provider-specific changes are handled by the upstream pi package
 
@@ -59,6 +58,6 @@ Track changes between pi-mono (upstream TypeScript) and pilot (Python port).
 **Agent loop** (`src/pilot_core/agent_loop.py`) — Ported from `packages/agent/src/agent-loop.ts`
 **Types** (`src/pilot_core/types.py`, `src/pilot_provider/types.py`) — Ported
 **Provider** (`src/pilot_provider/openrouter.py`) — Self-contained OpenRouter provider
-**Tools** (`src/pilot/tools/`) — Stubs only
+**Tools** (`src/pilot/tools/`) — Fully implemented (read, bash, edit, write, grep, find, ls)
 **Session** (`src/pilot/session/`) — Stubs only
 **Compaction** (`src/pilot/compaction/`) — Stubs only
