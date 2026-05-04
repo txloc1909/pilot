@@ -1,16 +1,44 @@
-"""Session management stub.
+"""Session management — load, save, and manipulate conversation sessions.
 
-Defines functions to load, save, and manipulate conversation sessions.
+This module provides the SessionManager class for managing conversation sessions
+stored as append-only trees in JSONL files. It's compatible with pi's session
+format for portability.
 """
 
-from typing import Any, Dict, List
+from .manager import SessionManager
+from .types import (
+    BranchSummaryEntry,
+    CompactionEntry,
+    CustomEntry,
+    CustomMessageEntry,
+    LabelEntry,
+    ModelChangeEntry,
+    NewSessionOptions,
+    SessionContext,
+    SessionEntry,
+    SessionHeader,
+    SessionInfo,
+    SessionInfoEntry,
+    SessionMessageEntry,
+    SessionTreeNode,
+    ThinkingLevelChangeEntry,
+)
 
-
-def load_session(path: str) -> List[Dict[str, Any]]:
-    """Load a session from a JSONL file – placeholder returns empty list."""
-    return []
-
-
-def save_session(path: str, messages: List[Dict[str, Any]]) -> None:
-    """Save a session to a JSONL file – placeholder does nothing."""
-    pass
+__all__ = [
+    "BranchSummaryEntry",
+    "CompactionEntry",
+    "CustomEntry",
+    "CustomMessageEntry",
+    "LabelEntry",
+    "ModelChangeEntry",
+    "NewSessionOptions",
+    "SessionContext",
+    "SessionEntry",
+    "SessionHeader",
+    "SessionInfo",
+    "SessionInfoEntry",
+    "SessionManager",
+    "SessionMessageEntry",
+    "SessionTreeNode",
+    "ThinkingLevelChangeEntry",
+]
