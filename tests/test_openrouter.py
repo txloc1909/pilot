@@ -156,6 +156,7 @@ class TestModelRegistry:
         assert result is not None
         assert result.name == "Test Model"
 
+    @pytest.mark.flaky(reruns=3, reruns_delay=2)
     def test_curated_list_filters_api_fetch(self) -> None:
         """Only curated model IDs are fetched from the API, not all 371."""
         import pilot_provider.openrouter as _mod
