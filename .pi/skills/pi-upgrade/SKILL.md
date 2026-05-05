@@ -11,6 +11,49 @@ Upgrade pi (the installed npm package) alongside pilot (the Python port) during 
 
 ---
 
+## Plan Mode Usage (Required for All Upgrades)
+
+This skill MUST use plan mode for all upgrade tasks. Follow this planning-centric workflow:
+
+### The Planning Workflow
+
+1. **Draft a numbered plan** with a `Plan:` header showing all steps
+2. **Propose the plan to the human** and seek feedback
+3. **Iterate on the plan** based on human input
+4. **Get explicit permission** from the human before starting execution
+5. **Execute step-by-step** with progress tracking using `[DONE:n]` markers
+
+### Example Plan Structure
+
+```
+Plan:
+1. Check current pi version and latest available version
+2. Review upstream changelog on GitHub for the target version
+3. Analyze impact on watched paths (agent loop, tools, session, etc.)
+4. Port any relevant changes to pilot's Python code
+5. Apply upgrade to latest pi version
+6. Run tests and verify functionality
+7. Commit changes with appropriate message
+```
+
+### Execution Pattern
+
+Execute each step, marking completion with `[DONE:n]` markers:
+
+```
+[DONE:1] Current version: 0.72.0, latest: 0.72.1
+[DONE:2] Reviewed CHANGELOG.md - only transport default change
+[DONE:3] Impact analysis complete - no changes in watched paths
+[DONE:4] No porting required for this release
+[DONE:5] Upgraded pi to v0.72.1
+[DONE:6] All tests passing
+[DONE:7] Committed with message "chore: upgrade pi to v0.72.1, sync pilot"
+```
+
+**Important**: This skill always uses plan mode for safe, structured execution with explicit progress tracking and human oversight.
+
+---
+
 ## Step 1: Inventory
 
 ```bash

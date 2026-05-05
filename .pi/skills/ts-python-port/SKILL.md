@@ -14,19 +14,32 @@ description: >
 This skill provides a structured methodology for porting TypeScript code to Python,
 with specific guidance for porting pi's components to pilot (the Python port).
 
-## Plan Mode Usage
+## Plan Mode Usage (Required for Complex Tasks)
 
-This skill works best in plan mode. When you begin a porting task:
+This skill MUST use plan mode for all porting tasks. Follow this planning-centric workflow:
 
-1. **Enable plan mode** using `/plan` or `--plan` flag
-2. **Create a numbered plan** with a `Plan:` header showing all steps
-3. **Execute step-by-step** with progress tracking using `[DONE:n]` markers
-4. **Follow the plan execution pattern** for multi-file porting tasks
+### The Planning Workflow
 
-**Important**: Use plan mode when porting multiple files or complex components.
-This ensures safe, structured execution with explicit progress tracking.
+1. **Draft a numbered plan** with a `Plan:` header showing all steps
+2. **Propose the plan to the human** and seek feedback
+3. **Iterate on the plan** based on human input
+4. **Get explicit permission** from the human before starting execution
+5. **Execute step-by-step** with progress tracking using `[DONE:n]` markers
 
-### When to Use Plan Mode vs Regular Mode
+### Example Plan Structure
+
+```
+Plan:
+1. Read and understand the TypeScript source files
+2. Map interfaces/types to Pydantic models
+3. Map functions to async Python functions
+4. Identify and map npm dependencies to Python equivalents
+5. Write the Python implementation files
+6. Write tests for the new Python code
+7. Run tests and fix any issues
+```
+
+### When to Use Plan Mode
 
 | Use Plan Mode | Use Regular Mode |
 |---|---|
@@ -35,6 +48,8 @@ This ensures safe, structured execution with explicit progress tracking.
 | Requires careful step-by-step execution | Quick one-off translation |
 | User asks for structured approach | User wants immediate results |
 | Need progress tracking and rollback safety | Simple, low-risk changes |
+
+**Important**: This skill always uses plan mode for safe, structured execution with explicit progress tracking and human oversight.
 
 Start by reading the relevant source code before proposing any translation.
 
