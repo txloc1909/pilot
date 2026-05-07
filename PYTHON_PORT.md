@@ -656,7 +656,7 @@ Textual components from Component 9.
 All from Components 1–9.
 
 ### Acceptance criteria
-- `pi` (no flags) launches interactive mode in the terminal.
+- `pilot` (no flags) launches interactive mode in the terminal.
 - Typing a message and pressing Ctrl+Enter sends it to the agent; streaming
   response appears in real time.
 - `/help` lists available slash commands.
@@ -664,7 +664,7 @@ All from Components 1–9.
   for the session.
 - `/compact` triggers manual compaction and shows a summary.
 - Ctrl+C aborts an in-progress agent turn without exiting.
-- Session persisted to disk; re-launching `pi` in the same directory resumes
+- Session persisted to disk; re-launching `pilot` in the same directory resumes
   the last session.
 - Keybindings configurable via `settings.json`; no hardcoded key checks
   anywhere.
@@ -676,7 +676,7 @@ All from Components 1–9.
 ## Build and Packaging
 
 - Package manager: `uv` for dependency management and virtual environments.
-- Entry point: `pi` CLI via a `pyproject.toml` `[project.scripts]` entry.
+- Entry point: `pilot` CLI via a `pyproject.toml` `[project.scripts]` entry.
 - Python minimum version: 3.12 (for `asyncio` task groups, `typing`
   improvements).
 - Linting: `ruff` for lint and format.
