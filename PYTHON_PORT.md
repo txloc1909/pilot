@@ -292,22 +292,187 @@ input, notify, setStatus, setWidget).
 The TypeScript original uses `jiti` to load `.ts` or `.js` files dynamically
 from `~/.pi/agent/extensions/` and per-project `.pi/extensions/`.
 
-### Decision: Replace
-`jiti` is a JS-only runtime loader. Replace with Python's `importlib` loading
-`.py` files from the extension directories. The extension API surface (hooks,
-tool registration, UI callbacks) is redesigned as Python abstract base classes
-/ protocols.
+### Decision: Use Native Python Patterns
+
+Instead of mimicking `jiti`'s dynamic loading, leverage Python's mature plugin
+ecosystem. Python doesn't need a JIT loader because `.py` files are already
+executable - we use standard Python import mechanisms.
+
+**Approach:**
+1. **Entry Points** for installed extensions (standard Python practice)
+2. **Native import** for development extensions (simple, no magic)
+3. **No custom loader needed** - Python's import system is sufficient
 
 ### Python equivalent
-- `importlib.util.spec_from_file_location` for runtime `.py` loading
-- `typing.Protocol` for the `ExtensionFactory` and `ExtensionAPI` interfaces
-- Extension UI requests delivered via callback passed into the extension
-  context; in interactive mode these are handled by the TUI; in RPC mode they
-  are serialized as JSON lines.
+
+**Extension API (Protocol):**
+```python
+# pilot/extensions/types.py
+from typing import Protocol, Callable, Any
+from pilot_core.types import AgentTool, AgentEvent
+
+class ExtensionAPI(Protocol):
+    """API provided to extensions for registration."""
+
+    def register_tool(self, tool: AgentTool) -> None:
+        """Register a custom LLM-callable tool."""
+        ...
+
+    def subscribe(self, event: str, handler: Callable[[Any], None]) -> None:
+        """Subscribe to agent lifecycle events."""
+        ...
+
+    def add_command(self, name: str, handler: Callable[[str], None]) -> None:
+        """Register a slash command."""
+        ...
+
+    def notify(self, message: str) -> None:
+        """Display a notification to the user."""
+        ...
+```
+
+**Entry Points (Installed Extensions):**
+```python
+# pilot/extensions/loader.py
+from importlib.metadata import entry_points
+from pathlib import Path
+
+def load_installed_extensions(api: ExtensionAPI) -> None:
+    """Load extensions registered via entry points."""
+    for ep in entry_points(group="pilot.extensions"):
+        try:
+            extension_func = ep.load()
+            extension_func(api)
+        except Exception as e:
+            logger.error(f"Failed to load extension {ep.name}: {e}")
+```
+
+**Development Extensions (Direct Import):**
+```python
+# pilot/extensions/loader.py
+import sys
+import importlib
+import importlib.util
+from pathlib import Path
+
+def load_development_extensions(api: ExtensionAPI, base_paths: list[Path]) -> None:
+    """Load development extensions from directories."""
+    for base_path in base_paths:
+        if not base_path.exists():
+            continue
+
+        # Support both directories and individual .py files
+        for item in base_path.iterdir():
+            if item.is_dir():
+                # Directory: add to sys.path, look for config or package
+                _load_directory_extension(api, item)
+            elif item.suffix == ".py":
+                # Single file: load directly
+                _load_file_extension(api, item)
+
+def _load_directory_extension(api: ExtensionAPI, path: Path) -> None:
+    """Load extension from a directory."""
+    # Check for pyproject.toml or pilot-extension.toml
+    config_path = path / "pyproject.toml"
+    if not config_path.exists():
+        config_path = path / "pilot-extension.toml"
+
+    if config_path.exists():
+        # Parse config to find entry point
+        entry_point = _parse_extension_config(config_path)
+        if entry_point:
+            sys.path.insert(0, str(path))
+            try:
+                module_name, func_name = entry_point.split(":")
+                module = importlib.import_module(module_name)
+                func = getattr(module, func_name)
+                func(api)
+            except Exception as e:
+                logger.error(f"Failed to load extension from {path}: {e}")
+            finally:
+                sys.path.remove(str(path))
+
+def _load_file_extension(api: ExtensionAPI, path: Path) -> None:
+    """Load extension from a single .py file."""
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    if spec and spec.loader:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        if hasattr(module, "register_extension"):
+            module.register_extension(api)
+```
+
+**Config File Parsing:**
+```python
+def _parse_extension_config(config_path: Path) -> str | None:
+    """Parse extension config to find entry point."""
+    import tomllib
+
+    with config_path.open("rb") as f:
+        config = tomllib.load(f)
+
+    # pyproject.toml format: [project.entry-points."pilot.extensions"]
+    if "project" in config and "entry-points" in config["project"]:
+        eps = config["project"]["entry-points"].get("pilot.extensions", {})
+        if eps:
+            # Return first entry point
+            return next(iter(eps.values()), None)
+
+    # pilot-extension.toml format: entry_point = "module:func"
+    return config.get("entry_point")
+```
+
+### Extension Directory Structure
+
+**Installed Extensions (via entry points):**
+```
+~/.local/share/uv/python/  # or site-packages
+  pilot-extension-foo/
+    pilot_foo/
+      __init__.py
+      tools.py
+    pyproject.toml          # Contains entry point declaration
+    README.md
+```
+
+**Development Extensions:**
+```
+~/.pi/agent/extensions/           # Global development extensions
+  my-extension/
+    my_extension/
+      __init__.py
+      tools.py
+    pyproject.toml               # Contains entry point
+    README.md
+
+.pi/extensions/                   # Per-project extensions
+  project-tool/
+    tool.py                      # Simple single-file extension
+    pilot-extension.toml         # Optional config file
+```
+
+**Extension Config Files:**
+
+`pyproject.toml` (standard Python package):
+```toml
+[project]
+name = "pilot-extension-foo"
+version = "1.0.0"
+
+[project.entry-points."pilot.extensions"]
+foo = "pilot_foo:register_extension"
+```
+
+`pilot-extension.toml` (simple development extension):
+```toml
+name = "my-extension"
+entry_point = "my_extension:register_extension"
+```
 
 ### Acceptance criteria
 - Extensions loaded from `~/.pi/agent/extensions/` and `.pi/extensions/` on
   session start.
+- Installed extensions discovered via entry points (group `"pilot.extensions"`).
 - An extension can register a custom tool; that tool appears in the agent's
   tool list and can be called by the LLM.
 - An extension can subscribe to `on_tool_call_start` / `on_tool_call_end`
@@ -316,6 +481,8 @@ tool registration, UI callbacks) is redesigned as Python abstract base classes
   function.
 - A test extension exercises all of the above using the mock provider.
 - Load errors in an extension are caught, logged, and do not crash the session.
+- Extension API uses Python `Protocol` for type safety.
+- **No custom loader class needed** - leverages existing Python import mechanisms.
 
 ---
 
