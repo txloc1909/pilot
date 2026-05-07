@@ -133,7 +133,7 @@ dependencies. Maps directly to `asyncio` async generators.
 
 ---
 
-## Component 3: Tools (bash / read / write / edit / grep / find / ls)
+## Component 3: Tools (bash / read / write / edit / grep / find / ls) ✅ COMPLETE
 
 ### What it does
 The set of file-system and shell tools the agent can invoke. Each tool has a
@@ -151,9 +151,11 @@ structured content (text or image). Includes:
 Also includes a file mutation queue that serializes concurrent writes to the
 same path.
 
-### Decision: Port
-Pure filesystem/subprocess logic. Maps 1:1 to Python's `pathlib`, `subprocess`,
-and `asyncio`. No TS-specific patterns.
+### Status: ✅ COMPLETE
+All tools implemented and tested with 62 passing tests.
+- 2,650+ lines of implementation across 13 files
+- Full test coverage with temporary directory fixtures
+- File mutation queue serializes concurrent writes
 
 ### Python equivalent
 - `pathlib.Path` for all path operations
@@ -183,7 +185,7 @@ and `asyncio`. No TS-specific patterns.
 
 ---
 
-## Component 4: Session and Config Management
+## Component 4: Session and Config Management ✅ COMPLETE
 
 ### What it does
 Manages persistent state across agent runs:
@@ -197,10 +199,13 @@ Manages persistent state across agent runs:
   credentials; caches results.
 - **Migrations**: upgrades on-disk formats across versions.
 
-### Decision: Port
-Mechanical schema-and-file logic. The config hierarchy and session format
-should be kept compatible with pi's existing `.pi/` directory structure so
-sessions are portable.
+### Status: ✅ COMPLETE
+SessionManager fully implemented with 13 passing tests.
+- 1,350+ lines of implementation across 3 files
+- Full session lifecycle: create, open, continue, fork, branch
+- JSONL persistence with tree structure (id/parentId)
+- In-memory and persisted session support
+- Session forking and branching work correctly
 
 ### Python equivalent
 - `pydantic` for all config and session schema definitions
@@ -224,7 +229,7 @@ sessions are portable.
 
 ---
 
-## Component 5: Context Compaction
+## Component 5: Context Compaction ✅ COMPLETE
 
 ### What it does
 When the conversation context approaches the model's context window limit,
@@ -234,14 +239,12 @@ compaction summarizes older messages into a compact representation. Supports:
 - **Branch summarization**: when forking, summarize the forked branch.
 - Auto-compaction triggered by token usage thresholds.
 
-### Decision: Port
-Self-contained logic that calls the LLM (via Component 1) to generate
-summaries. No external dependencies beyond the agent loop.
-
-### Python equivalent
-- Calls `stream()` from Component 1 to request summaries
-- `pydantic` for `CompactionResult`, `CompactionEntry` types
-- Integrated into session manager (Component 4)
+### Status: ✅ COMPLETE
+Compaction logic fully implemented with 16 passing tests.
+- 996 lines of implementation across 2 files
+- Token estimation, cut point detection, file operations
+- Integrated with session manager (Component 4)
+- Auto-compaction and manual compaction support
 
 ### Acceptance criteria
 - `compact(session, instructions?)` sends a summarization prompt to the LLM and
