@@ -373,3 +373,117 @@ Hello $1! Welcome to the project.
             )
             system_prompt = build_system_prompt(prompt_options)
             assert "Custom prompt" in system_prompt
+
+    def test_get_readme_path_returns_absolute_path(self):
+        """Test that get_readme_path returns an absolute path."""
+        from pilot.config import get_readme_path
+        
+        readme_path = get_readme_path()
+        assert readme_path.endswith("README.md")
+        assert readme_path.startswith("/")  # Absolute path
+        assert "pilot" in readme_path  # Contains package name
+
+    def test_escape_xml_escapes_special_chars(self):
+        """Test that _escape_xml properly escapes XML special characters."""
+        from pilot.prompts.system_prompt import _escape_xml
+        
+        test_cases = [
+            ("<tag>", "&lt;tag&gt;"),
+            ('"quote"', "&quot;quote&quot;"),
+            ("Tom & Jerry", "Tom &amp; Jerry"),
+            ("It's a test", "It&apos;s a test"),
+        ]
+        
+        for input_text, expected in test_cases:
+            assert _escape_xml(input_text) == expected
+
+    def test_skills_xml_formatting(self):
+        """Test that skills are formatted as XML with proper escaping."""
+        from pilot.prompts.system_prompt import _format_skills_for_prompt
+        from pilot_core.types import Skill
+        
+        skills = [
+            Skill(
+                name="test-skill",
+                description="A test skill with <special> & chars",
+                filePath="/path/to/skill.md",
+            )
+        ]
+        
+        result = _format_skills_for_prompt(skills)
+        
+        assert "<available_skills>" in result
+        assert "<skill>" in result
+        assert "<name>test-skill</name>" in result
+        assert "&lt;special&gt;" in result  # Escaped <>
+        assert "&amp;" in result  # Escaped &
+        assert "<location>/path/to/skill.md</location>" in result
+
+    def test_skills_filtering_by_disable_model_invocation(self):
+        """Test that skills with disableModelInvocation=True are excluded."""
+        from pilot.prompts.system_prompt import _format_skills_for_prompt
+        from pilot_core.types import Skill
+        
+        skills = [
+            Skill(name="visible", description="This should appear"),
+            Skill(name="hidden", description="This should NOT appear", disableModelInvocation=True),
+        ]
+        
+        result = _format_skills_for_prompt(skills)
+        
+        assert "visible" in result
+        assert "hidden" not in result
+        assert "This should appear" in result
+        assert "This should NOT appear" not in result
+
+    def test_system_prompt_uses_actual_documentation_paths(self):
+        """Test that system prompt uses actual package documentation paths."""
+        from pilot.config import get_readme_path, get_docs_path, get_examples_path
+        
+        readme_path = get_readme_path()
+        docs_path = get_docs_path()
+        examples_path = get_examples_path()
+        
+        from pilot.prompts.system_prompt import build_system_prompt
+        from pilot.prompts.types import BuildSystemPromptOptions
+        
+        options = BuildSystemPromptOptions(cwd="/test/project")
+        prompt = build_system_prompt(options)
+        
+        # Verify the actual paths appear in the prompt
+        assert readme_path in prompt
+        assert docs_path in prompt
+        assert examples_path in prompt
+        
+        # Verify hardcoded relative paths don't appear
+        # (the prompt may contain "docs/" in documentation references, but not as actual paths)
+        assert "docs/README.md" not in prompt
+        assert "Main documentation: docs/README.md" not in prompt
+        assert "Additional docs: docs/" not in prompt
+        assert "Examples: examples/" not in prompt
+
+    def test_system_prompt_with_skills(self):
+        """Test system prompt generation with Skill objects."""
+        from pilot.prompts.system_prompt import build_system_prompt
+        from pilot.prompts.types import BuildSystemPromptOptions
+        from pilot_core.types import Skill
+        
+        skills = [
+            Skill(
+                name="python-expert",
+                description="Expert guidance for Python development",
+                filePath="/skills/python-expert/SKILL.md",
+            ),
+        ]
+        
+        options = BuildSystemPromptOptions(
+            cwd="/test/project",
+            skills=skills,
+        )
+        
+        prompt = build_system_prompt(options)
+        
+        assert "<available_skills>" in prompt
+        assert "python-expert" in prompt
+        assert "Python development" in prompt
+        assert "<location>/skills/python-expert/SKILL.md</location>" in prompt

@@ -6,26 +6,61 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, List
 
+from pilot.config import get_docs_path, get_examples_path, get_readme_path
+from pilot_core.types import Skill
 from .types import BuildSystemPromptOptions
 
 
-def _format_skills_for_prompt(skills: List[Any]) -> str:
-    """
-    Format skills for inclusion in the system prompt.
+def _escape_xml(text: str) -> str:
+    """Escape special XML characters in text.
     
-    This is a simplified version. The full implementation would format
-    skill names, descriptions, and triggers for the LLM.
+    Args:
+        text: The text to escape
+        
+    Returns:
+        Text with XML special characters escaped
     """
-    if not skills:
+    return (
+        text.replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace('"', "&quot;")
+        .replace("'", "&apos;")
+    )
+
+
+def _format_skills_for_prompt(skills: List[Skill]) -> str:
+    """
+    Format skills for inclusion in the system prompt using XML format.
+    
+    Filters out skills with disableModelInvocation=True.
+    """
+    # Filter skills that should be visible to the model
+    visible_skills = [s for s in skills if not s.disableModelInvocation]
+    
+    if not visible_skills:
         return ""
     
-    result = "\n\n# Available Skills\n\n"
-    for skill in skills:
-        # Assuming skill has name and description attributes
-        if hasattr(skill, "name") and hasattr(skill, "description"):
-            result += f"## {skill.name}\n\n{skill.description}\n\n"
+    lines = [
+        "\n\nThe following skills provide specialized instructions for specific tasks.",
+        "Use the read tool to load a skill's file when the task matches its description.",
+        "When a skill file references a relative path, resolve it against the skill directory",
+        "(parent of SKILL.md / dirname of the path) and use that absolute path in tool commands.",
+        "",
+        "<available_skills>",
+    ]
     
-    return result
+    for skill in visible_skills:
+        lines.append("  <skill>")
+        lines.append(f"    <name>{_escape_xml(skill.name)}</name>")
+        lines.append(f"    <description>{_escape_xml(skill.description)}</description>")
+        if skill.filePath:
+            lines.append(f"    <location>{_escape_xml(skill.filePath)}</location>")
+        lines.append("  </skill>")
+    
+    lines.append("</available_skills>")
+    
+    return "\n".join(lines)
 
 
 def _get_git_info(cwd: str) -> tuple[str | None, str | None]:
@@ -141,10 +176,10 @@ def build_system_prompt(options: BuildSystemPromptOptions) -> str:
         prompt += f"\nCurrent working directory: {prompt_cwd}"
         return prompt
     
-    # Get absolute paths to documentation and examples (these would come from config)
-    readme_path = "docs/README.md"
-    docs_path = "docs/"
-    examples_path = "examples/"
+    # Get absolute paths to documentation and examples
+    readme_path = get_readme_path()
+    docs_path = get_docs_path()
+    examples_path = get_examples_path()
     
     # Build tools list based on selected tools
     tools = selected_tools or ["read", "bash", "edit", "write"]

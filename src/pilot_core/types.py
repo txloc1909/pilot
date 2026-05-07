@@ -91,6 +91,26 @@ class AgentTool(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Skill types
+# ---------------------------------------------------------------------------
+
+
+class Skill(BaseModel):
+    """A skill provides specialized instructions for specific tasks.
+    
+    Skills are loaded from ~/.pi/skills/ and can be referenced in prompts
+    to provide the LLM with domain-specific knowledge and workflows.
+    """
+    
+    name: str = Field(..., description="Name of the skill (used in SKILL.md frontmatter)")
+    description: str = Field(..., description="Brief description of what the skill does")
+    filePath: Optional[str] = Field(None, description="Path to the skill's SKILL.md file")
+    disableModelInvocation: bool = Field(
+        False, description="If True, exclude this skill from the system prompt"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Hook types
 # ---------------------------------------------------------------------------
 

@@ -110,6 +110,11 @@ def get_examples_path() -> str:
     return str(Path(__file__).resolve().parent.parent.parent / "examples")
 
 
+def get_readme_path() -> str:
+    """Get path to README.md (package-relative)."""
+    return str(Path(__file__).resolve().parent.parent.parent / "README.md")
+
+
 def get_project_settings_path(cwd: str) -> str:
     """Get path to per-project settings.json (<cwd>/.pi/settings.json)."""
     return str(Path(cwd) / CONFIG_DIR_NAME / "settings.json")

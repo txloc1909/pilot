@@ -3,6 +3,8 @@
 from typing import Any, List, Optional
 from pydantic import BaseModel, Field
 
+from pilot_core.types import Skill
+
 
 class SourceInfo(BaseModel):
     """Information about the source of a prompt template."""
@@ -39,4 +41,4 @@ class BuildSystemPromptOptions(BaseModel):
     appendSystemPrompt: Optional[str] = Field(None, description="Text to append to system prompt")
     cwd: str = Field(..., description="Working directory")
     contextFiles: Optional[List[dict[str, Any]]] = Field(None, description="Pre-loaded context files")
-    skills: Optional[List[Any]] = Field(None, description="Pre-loaded skills")
+    skills: Optional[List[Skill]] = Field(None, description="Pre-loaded skills")
