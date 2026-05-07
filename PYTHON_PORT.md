@@ -486,6 +486,84 @@ entry_point = "my_extension:register_extension"
 
 ---
 
+## Component 7.5: SDK Entry Point (Programmatic Usage)
+
+### What it does
+Provides a unified API for using pilot programmatically, analogous to pi's
+`createAgentSession()`. Wires together provider, agent loop, tools, and
+session management into a cohesive interface.
+
+### The Problem
+Pilot's components are isolated in separate modules. Users would need to
+manually wire together AuthStorage, ModelRegistry, SessionManager, tools,
+and the agent loop - complex and error-prone.
+
+### The Solution
+Create a unified `create_agent_session()` function that handles all wiring
+internally with sensible defaults.
+
+### API Design
+
+```python
+# pilot/__init__.py exports:
+from pilot import (
+    create_agent_session,  # Main entry point
+    AgentSession,          # Session with prompt(), subscribe()
+    AgentSessionConfig,    # Configuration
+)
+
+# Core usage:
+session = await create_agent_session(
+    model="anthropic/claude-sonnet-4",
+    thinking_level="off",
+    cwd="/project",
+)
+session.subscribe(lambda e: print(e))
+await session.prompt("Hello!")
+```
+
+**Tool helpers:**
+- `coding_tools(cwd)` - All tools (bash, read, write, edit, grep, find, ls)
+- `read_only_tools(cwd)` - Read-only tools only
+
+### Implementation
+
+**Files:**
+- `pilot/sdk.py` - `create_agent_session()` implementation
+- `pilot/__init__.py` - Export SDK API
+- `pilot/tools/__init__.py` - Add `coding_tools()` and `read_only_tools()`
+
+**Function signature:**
+```python
+async def create_agent_session(
+    model: Optional[Model] = None,
+    thinking_level: Optional[str] = None,
+    cwd: Optional[str] = None,
+    in_memory: bool = False,
+    tools: Optional[list[AgentTool]] = None,
+    custom_tools: Optional[list[dict]] = None,
+    auth_storage: Optional[AuthStorage] = None,
+    model_registry: Optional[ModelRegistry] = None,
+) -> AgentSession:
+    ...
+```
+
+### Acceptance criteria
+
+- `create_agent_session()` exported from `pilot` package
+- `AgentSession` class with `prompt()`, `subscribe()`, `state` properties
+- Automatic wiring: AuthStorage → ModelRegistry → SessionManager → Tools
+- Default behavior: `cwd=Path.cwd()`, auto-discover models, persisted session
+- Examples in `examples/sdk/` (minimal, custom_model, read_only, in_memory)
+- Tests for defaults, custom model, read-only tools, in-memory sessions
+
+### Dependency Order
+
+Depends on Components 1-5 (Provider, Agent Loop, Tools, Session, Settings).
+Implement after those components have working stubs/tests.
+
+---
+
 ## Component 8: RPC Mode
 
 ### What it does
