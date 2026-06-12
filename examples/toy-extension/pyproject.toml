@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pilot-toy-ext"
+version = "0.1.0"
+description = "A toy extension for pilot demonstrating the extension system."
+requires-python = ">=3.12"
+dependencies = []
+
+[project.entry-points."pilot.extensions"]
+toy-ext = "pilot_toy_ext:register_extension"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pilot_toy_ext"]

@@ -33,6 +33,29 @@ def wrap_tool_definition(
             result = await definition.execute(
                 tool_call_id, params, signal, on_update, ctx
             )
+            # Extension tools may return a dict instead of AgentToolResult.
+            # Convert plain dicts to the expected type.
+            if isinstance(result, dict):
+                raw_content = result.get("content", [])
+                typed_content = []
+                for c in raw_content:
+                    if isinstance(c, dict):
+                        if c.get("type") == "text":
+                            typed_content.append(TextContent(text=c.get("text", "")))
+                        elif c.get("type") == "image":
+                            typed_content.append(ImageContent(
+                                data=c.get("data", ""),
+                                mime_type=c.get("mimeType", c.get("mime_type", "")),
+                            ))
+                        else:
+                            typed_content.append(TextContent(text=str(c)))
+                    else:
+                        typed_content.append(c)
+                return AgentToolResult(
+                    content=typed_content,
+                    details=result.get("details"),
+                    terminate=result.get("terminate"),
+                )
             return result
         except Exception as err:
             # Thrown errors signal isError=true to the LLM
