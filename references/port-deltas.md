@@ -4,6 +4,45 @@ Track changes between pi-mono (upstream TypeScript) and pilot (Python port).
 
 ---
 
+## v0.73.0 → v0.79.1 (2026-06-12)
+
+**Status:** partial (agent loop fix ported, remaining items are harness/session/extension layer)
+
+### Agent loop (`packages/agent/src/`)
+- [x] **Tool-call preflight abort fix** — Stop preparing sibling tool calls after the run is aborted. Ported abort checks to `_execute_tool_calls_sequential`, `_execute_tool_calls_parallel`, and `_prepare_tool_call` (commit b9448276).
+- [ ] **Tail truncation fix** — Fixed tail truncation for oversized single-line output ending with newline (v0.75.4). Tool output handling, not yet ported.
+- [ ] **Context token estimate fix** — Count user image attachments consistently with tool result images (v0.76.0). Minor accounting fix.
+- [ ] **Event renames** — `model_select`→`model_update`, `thinking_level_select`→`thinking_level_update` (v0.77.0 breaking). Pilot doesn't have these harness-level events yet.
+- [ ] **Tool registry APIs** — Added tool registry, `tools_update` events, branch-scoped active-tool persistence (v0.77.0). New harness features.
+- [ ] **Compaction summarization fix** — Neutral AI assistant wording for non-coding agents (v0.79.0). Compaction is stub-only.
+
+### File tools (`packages/coding-agent/src/core/tools/`)
+- [ ] No significant tool implementation changes in this range. Provider-specific and UI changes only.
+
+### Session (`agent-session.ts`)
+- [ ] **Project trust** — Asks before loading project-local settings, resources, instructions (v0.79.0). Session layer is stub-only.
+- [ ] **Named sessions** — `--name`/`-n` flag for session display name (v0.78.0).
+- [ ] **Session IDs** — `--session-id` for exact project-local session (v0.76.0).
+- [ ] **Exclude tools** — `--exclude-tools`/`-xt` flag (v0.77.0).
+
+### Extension API
+- [ ] **`ctx.mode`** — Extensions can distinguish TUI/RPC/JSON/print mode (v0.78.1).
+- [ ] **`ctx.getSystemPromptOptions()`** — Inspect base system prompt inputs (v0.78.1).
+- [ ] **`ctx.isProjectTrusted()`** — Observe effective project trust decision (v0.79.1).
+- [ ] **`streamingBehavior`** — Extensions distinguish idle prompts from mid-stream steers (v0.77.0).
+- [ ] **Autocomplete triggers** — Extension autocomplete can declare trigger characters (v0.79.1).
+
+### Provider/Model changes
+- [ ] Claude Fable 5, Claude Opus 4.8 — Model metadata updates.
+- [ ] Various provider-specific fixes (Bedrock, Azure, OpenRouter, etc.).
+
+### Gaps
+- Pilot session/compaction are stubs — upstream session changes don't require porting yet
+- Extension API additions are harness-layer features for when pilot implements extensions
+- Provider-specific changes handled by the upstream pi package during interim period
+
+---
+
 ## v0.72.1 → v0.73.0 (2026-05-05)
 
 **Status:** synced (no core changes needed)

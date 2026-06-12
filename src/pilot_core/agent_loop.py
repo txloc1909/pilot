@@ -573,6 +573,10 @@ async def _execute_tool_calls_sequential(
         await emit(AgentEvent(type="message_end", message=trm))
         finalized_calls.append(finalized)
 
+        # ported from pi-mono commit b9448276: stop tool preflight after abort
+        if signal is not None and signal.is_set():
+            break
+
     messages = [_create_tool_result_message(f) for f in finalized_calls]
     terminate = _should_terminate_batch(finalized_calls)
     return {"messages": messages, "terminate": terminate}
@@ -624,6 +628,9 @@ async def _execute_tool_calls_parallel(
                 )
             )
             finalized_calls[idx] = finalized
+            # ported from pi-mono commit b9448276: stop tool preflight after abort
+            if signal is not None and signal.is_set():
+                break
         else:
             task = asyncio.create_task(
                 _execute_and_finalize_parallel(
@@ -636,6 +643,9 @@ async def _execute_tool_calls_parallel(
                 )
             )
             pending.append((idx, task))
+            # ported from pi-mono commit b9448276: stop tool preflight after abort
+            if signal is not None and signal.is_set():
+                break
 
     if pending:
         # Wrap each task so as_completed yields (idx, result) on completion
@@ -750,6 +760,13 @@ async def _prepare_tool_call(
                 context=current_context,
             )
             before_result = await config.before_tool_call(ctx, signal)
+            # ported from pi-mono commit b9448276: stop tool preflight after abort
+            if signal is not None and signal.is_set():
+                return {
+                    "kind": "immediate",
+                    "result": _create_error_tool_result("Operation aborted"),
+                    "is_error": True,
+                }
             if before_result and before_result.block:
                 return {
                     "kind": "immediate",
@@ -758,6 +775,13 @@ async def _prepare_tool_call(
                     ),
                     "is_error": True,
                 }
+        # ported from pi-mono commit b9448276: stop tool preflight after abort
+        if signal is not None and signal.is_set():
+            return {
+                "kind": "immediate",
+                "result": _create_error_tool_result("Operation aborted"),
+                "is_error": True,
+            }
 
         return {
             "kind": "prepared",
