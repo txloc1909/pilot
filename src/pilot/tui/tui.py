@@ -347,7 +347,12 @@ class TUI(Container):
 
         self._render_requested = True
         # Schedule render on next tick
-        asyncio.get_event_loop().call_soon(self._schedule_render)
+        try:
+            loop = asyncio.get_running_loop()
+            loop.call_soon(self._schedule_render)
+        except RuntimeError:
+            # No event loop running (e.g. in synchronous tests) — render immediately
+            self._schedule_render()
 
     def _schedule_render(self) -> None:
         """Schedule the actual render operation."""
