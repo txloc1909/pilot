@@ -14,15 +14,25 @@ build/packaging details.
 ```
 src/
 ├── pilot/             ← CLI, tools/, session/, compaction/
+│   ├── extensions/    ← extension system (Component 7)
 │   ├── tools/         ← bash, read, write, edit (all stubs)
 │   ├── session/       ← session management
-│   └── compaction/    ← session compaction
+│   ├── settings/      ← settings management
+│   ├── auth/          ← auth storage
+│   ├── models/        ← model registry
+│   ├── prompts/       ← system prompt, prompt templates
+│   ├── compaction/    ← session compaction
+│   └── tui/           ← terminal UI (Component 9)
 ├── pilot_core/        ← agent loop
 │   ├── types.py       ← AgentEvent, AgentTool, AgentContext, AgentLoopConfig
 │   └── agent_loop.py  ← agent_loop() / agent_loop_continue() async generators
 └── pilot_provider/    ← provider abstraction
     ├── types.py       ← ProviderEvent, Model, Message, ContentBlock, Usage
     └── openrouter.py  ← stream() async generator, model registry
+
+examples/
+└── toy-extension/     ← demo extension package (Component 7)
+
 tests/
 ```
 
