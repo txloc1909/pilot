@@ -213,6 +213,53 @@ class TestEditDiff:
                 str(tmp_path / "test.txt"),
             )
 
+    def test_fuzzy_edit_preserves_untouched_trailing_whitespace(self, tmp_path):
+        """Regression: fuzzy match must not strip trailing whitespace from untouched lines.
+
+        Ported from pi-mono PR #5898 / issue #5899.
+        """
+        # File has trailing whitespace on every line
+        original = "untouched   \nreplace me   \nafter\ntrailing   "
+        # oldText omits trailing whitespace => fuzzy match
+        result = apply_edits_to_normalized_content(
+            original,
+            [Edit(old_text="replace me\nafter", new_text="DONE\nDONE2")],
+            str(tmp_path / "test.txt"),
+        )
+        # Untouched lines must keep their trailing whitespace
+        assert result.new_content == "untouched   \nDONE\nDONE2\ntrailing   "
+
+    def test_fuzzy_edit_preserves_untouched_smart_quotes(self, tmp_path):
+        """Regression: fuzzy match must not normalize smart quotes on untouched lines.
+
+        Ported from pi-mono PR #5898 / issue #5899.
+        """
+        # File has smart quotes on untouched line
+        original = "he said \u201chello\u201d\nreplace me\nend"
+        # oldText uses ASCII quotes => fuzzy match
+        result = apply_edits_to_normalized_content(
+            original,
+            [Edit(old_text="replace me", new_text="DONE")],
+            str(tmp_path / "test.txt"),
+        )
+        # Smart quotes on untouched line must be preserved
+        assert result.new_content == "he said \u201chello\u201d\nDONE\nend"
+
+    def test_fuzzy_edit_preserves_untouched_unicode_dashes(self, tmp_path):
+        """Regression: fuzzy match must not normalize dashes on untouched lines.
+
+        Ported from pi-mono PR #5898 / issue #5899.
+        """
+        original = "item \u2014 description\nfix this\nother \u2013 line"
+        # oldText uses ASCII dash => fuzzy match
+        result = apply_edits_to_normalized_content(
+            original,
+            [Edit(old_text="fix this", new_text="fixed")],
+            str(tmp_path / "test.txt"),
+        )
+        # Em dashes and en dashes on untouched lines must be preserved
+        assert result.new_content == "item \u2014 description\nfixed\nother \u2013 line"
+
     def test_generate_diff_string(self, tmp_path):
         result = generate_diff_string("hello world\nfoo bar", "hi world\nfoo baz")
         assert result.diff

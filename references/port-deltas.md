@@ -4,6 +4,46 @@ Track changes between pi-mono (upstream TypeScript) and pilot (Python port).
 
 ---
 
+## v0.79.1 → v0.79.10 (2026-06-23)
+
+**Status:** synced (one critical fix ported, remaining items are provider/harness/extension layer)
+
+### Agent loop (`packages/agent/src/`)
+- [x] No relevant changes — v0.79.2 late tool progress callback fix and v0.79.9 WSL bash fix are not applicable to pilot's agent loop implementation.
+
+### File tools (`packages/coding-agent/src/core/tools/`)
+- [x] **Fuzzy edit match data-loss fix** — When any edit matched fuzzily (trailing whitespace, smart quotes, etc.), the entire file was rewritten in normalized form, corrupting all untouched lines. Ported the fix from pi-mono PR #5898: build a norm-to-orig offset map and splice replacements into the original content, preserving untouched lines byte-for-byte. Added `_build_norm_to_orig_map()` and `_normalize_single_char()` to `edit_diff.py`, switched `apply_edits_to_normalized_content()` to use mapping-based splicing for fuzzy matches. Also refactored `normalize_for_fuzzy_match()` to use `str.translate()` with ordinal-keyed dicts instead of `re.sub()` for character replacements. Regression tests added.
+- [ ] **Find tool nested git repo boundary** — v0.79.10: Fixed find to respect nested `.gitignore` rules. Not ported: pilot's find tool uses fd which handles gitignore by default.
+
+### Session (`agent-session.ts`)
+- [ ] **Deep session branch fix** — v0.79.9: Fixed quadratic time for deep branches. Session layer is stub-only.
+- [ ] **Same-directory session switch fix** — v0.79.9: Reuse imported extension modules on session switch. Session layer is stub-only.
+
+### Compaction (`compaction/`)
+- [ ] **Extension compaction event context** — v0.79.10: Added `reason` and `willRetry` to compaction events. Compaction is stub-only.
+- [ ] **Post-compaction token estimates** — v0.79.8: Added estimated post-compaction token counts. Compaction is stub-only.
+- [ ] **Refuse empty sessions** — v0.79.8: Refuse sessions with no eligible messages. Compaction is stub-only.
+
+### Extension API
+- [ ] **`CONFIG_DIR_NAME` export** — v0.79.7: Extensions can resolve project config paths without hardcoding `.pi`.
+- [ ] **Edit diff helpers export** — v0.79.7: `generateDiffString`, `generateUnifiedPatch`, `EditDiffResult` exported from public API.
+- [ ] **Automatic theme mode** — v0.79.7: Separate light/dark themes.
+- [ ] **Extension compaction event metadata** — v0.79.10: `reason` and `willRetry` in compaction events.
+
+### Provider/Model changes
+- [ ] Chat-template thinking compatibility for vLLM/HuggingFace (v0.79.9)
+- [ ] GLM-5.2 provider improvements (v0.79.9)
+- [ ] Mistral prompt caching (v0.79.8)
+- [ ] OpenRouter Fusion alias (v0.79.8)
+- [ ] Various provider-specific fixes (Bedrock, Azure, OpenRouter, Vercel, etc.)
+
+### Gaps
+- All ported items are agent-core or tool-implementation changes
+- Provider-specific changes are handled by the upstream pi package during interim period
+- Session/compaction/extension changes don't require porting yet (stubs only)
+
+---
+
 ## v0.73.0 → v0.79.1 (2026-06-12)
 
 **Status:** partial (agent loop fix ported, remaining items are harness/session/extension layer)

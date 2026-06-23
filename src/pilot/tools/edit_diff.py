@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import difflib
 import os
-import re
 import unicodedata
 from typing import Dict, List, Optional, Union
 
@@ -48,6 +47,29 @@ def restore_line_endings(text: str, ending: str) -> str:
 # Fuzzy matching normalization
 # ---------------------------------------------------------------------------
 
+# Character-level replacement maps (all 1-to-1, preserving length)
+# Keys are Unicode ordinals (required by str.translate).
+_SMART_SINGLE_QUOTES = {ord(k): "'" for k in "\u2018\u2019\u201A\u201B"}
+_SMART_DOUBLE_QUOTES = {ord(k): '"' for k in "\u201C\u201D\u201E\u201F"}
+_UNICODE_DASHES = {ord(k): "-" for k in "\u2010\u2011\u2012\u2013\u2014\u2015\u2212"}
+_SPECIAL_SPACES = {
+    ord(k): " "
+    for k in "\u00A0\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009"
+             "\u200A\u202F\u205F\u3000"
+}
+
+
+def _normalize_single_char(char: str) -> str:
+    """Apply character-level normalizations (smart quotes, dashes, spaces)."""
+    code = ord(char)
+    return (
+        _SMART_SINGLE_QUOTES.get(code)
+        or _SMART_DOUBLE_QUOTES.get(code)
+        or _UNICODE_DASHES.get(code)
+        or _SPECIAL_SPACES.get(code)
+        or char
+    )
+
 
 def normalize_for_fuzzy_match(text: str) -> str:
     """Normalize text for fuzzy matching.
@@ -66,16 +88,59 @@ def normalize_for_fuzzy_match(text: str) -> str:
     lines = [line.rstrip() for line in lines]
     text = "\n".join(lines)
 
-    # Smart single quotes → '
-    text = re.sub(r"[\u2018\u2019\u201A\u201B]", "'", text)
-    # Smart double quotes → "
-    text = re.sub(r"[\u201C\u201D\u201E\u201F]", '"', text)
-    # Various dashes/hyphens → -
-    text = re.sub(r"[\u2010\u2011\u2012\u2013\u2014\u2015\u2212]", "-", text)
-    # Special spaces → regular space
-    text = re.sub(r"[\u00A0\u2002-\u200A\u202F\u205F\u3000]", " ", text)
+    # Character-level replacements via translate (preserves length)
+    text = text.translate(_SMART_SINGLE_QUOTES)
+    text = text.translate(_SMART_DOUBLE_QUOTES)
+    text = text.translate(_UNICODE_DASHES)
+    text = text.translate(_SPECIAL_SPACES)
 
     return text
+
+
+def _build_norm_to_orig_map(original: str) -> tuple[str, list[int]]:
+    """Build a mapping from normalized positions to original positions.
+
+    Returns ``(normalized_text, norm_to_orig)`` where ``norm_to_orig[i]``
+    gives the character index in *original* that corresponds to position *i*
+    in *normalized_text*.
+
+    The mapping is built by applying the same transformations as
+    ``normalize_for_fuzzy_match`` step-by-step while tracking position
+    correspondence.  This allows callers to locate a fuzzy match found in
+    normalized space back in the original content.
+
+    ported from pi-mono PR #5898: preserve untouched content in fuzzy edits
+    """
+    # Step 1 -- NFKC normalization with per-character mapping
+    nfkc_chars: list[str] = []
+    nfkc_to_orig: list[int] = []
+    for orig_idx, ch in enumerate(original):
+        expanded = unicodedata.normalize("NFKC", ch)
+        for ec in expanded:
+            nfkc_chars.append(ec)
+            nfkc_to_orig.append(orig_idx)
+    nfkc_str = "".join(nfkc_chars)
+
+    # Step 2 -- Strip trailing whitespace per line
+    nfkc_lines = nfkc_str.split("\n")
+    stripped_chars: list[str] = []
+    stripped_to_orig: list[int] = []
+    nfkc_pos = 0
+    for line_idx, line in enumerate(nfkc_lines):
+        stripped_len = len(line.rstrip())
+        for ci in range(stripped_len):
+            stripped_chars.append(line[ci])
+            stripped_to_orig.append(nfkc_to_orig[nfkc_pos + ci])
+        # Preserve newline between lines
+        if line_idx < len(nfkc_lines) - 1:
+            stripped_chars.append("\n")
+            stripped_to_orig.append(nfkc_to_orig[nfkc_pos + len(line)])
+        nfkc_pos += len(line) + 1  # +1 for the split delimiter
+
+    # Step 3 -- Character-level normalizations (all 1-to-1)
+    norm_chars = [_normalize_single_char(c) for c in stripped_chars]
+
+    return "".join(norm_chars), stripped_to_orig
 
 
 class FuzzyMatchResult:
@@ -114,7 +179,7 @@ def fuzzy_find_text(content: str, old_text: str) -> FuzzyMatchResult:
             content_for_replacement=content,
         )
 
-    # Try fuzzy match — work entirely in normalized space
+    # Try fuzzy match -- work entirely in normalized space
     fuzzy_content = normalize_for_fuzzy_match(content)
     fuzzy_old_text = normalize_for_fuzzy_match(old_text)
     fuzzy_index = fuzzy_content.find(fuzzy_old_text)
@@ -244,9 +309,10 @@ def apply_edits_to_normalized_content(
     """Apply one or more exact-text replacements to LF-normalized content.
 
     All edits are matched against the same original content. Replacements are
-    then applied in reverse order so offsets remain stable. If any edit needs
-    fuzzy matching, the operation runs in fuzzy-normalized content space to
-    preserve current single-edit behavior.
+    then applied in reverse order so offsets remain stable.  When fuzzy
+    matching is required, the match is located in normalized space but the
+    replacement is spliced into the *original* content so that untouched lines
+    remain byte-for-byte identical (ported from pi-mono PR #5898).
     """
     # Normalize edits to Edit objects
     normalized_edits: List[Edit] = []
@@ -273,20 +339,24 @@ def apply_edits_to_normalized_content(
 
     # Check if any edit needs fuzzy matching
     initial_matches = [fuzzy_find_text(normalized_content, edit.old_text) for edit in normalized_edits]
-    base_content = (
-        normalize_for_fuzzy_match(normalized_content)
-        if any(match.used_fuzzy_match for match in initial_matches)
-        else normalized_content
-    )
+    needs_fuzzy = any(match.used_fuzzy_match for match in initial_matches)
+
+    if needs_fuzzy:
+        # Build mapping from normalized positions back to original positions
+        # so untouched lines remain byte-for-byte identical.
+        norm_content, norm_to_orig = _build_norm_to_orig_map(normalized_content)
+    else:
+        norm_content = normalized_content
+        norm_to_orig = None  # type: ignore[assignment]
 
     # Find and validate each edit
     matched_edits: List[MatchedEdit] = []
     for i, edit in enumerate(normalized_edits):
-        match_result = fuzzy_find_text(base_content, edit.old_text)
+        match_result = fuzzy_find_text(norm_content, edit.old_text)
         if not match_result.found:
             raise ValueError(_get_not_found_error(path, i, len(normalized_edits)))
 
-        occurrences = _count_occurrences(base_content, edit.old_text)
+        occurrences = _count_occurrences(norm_content, edit.old_text)
         if occurrences > 1:
             raise ValueError(_get_duplicate_error(path, i, len(normalized_edits), occurrences))
 
@@ -312,19 +382,34 @@ def apply_edits_to_normalized_content(
                 "Merge them into one edit or target disjoint regions."
             )
 
-    # Apply in reverse order so offsets remain stable
-    new_content = base_content
-    for m in reversed(matched_edits):
-        new_content = (
-            new_content[: m.match_index]
-            + m.new_text
-            + new_content[m.match_index + m.match_length :]
-        )
+    if needs_fuzzy:
+        # Map fuzzy-match boundaries back to the original content and splice
+        # replacements there, preserving untouched lines byte-for-byte.
+        assert norm_to_orig is not None
+        new_content = normalized_content
+        for m in reversed(matched_edits):
+            orig_start = norm_to_orig[m.match_index]
+            orig_end = norm_to_orig[m.match_index + m.match_length - 1] + 1
+            new_content = new_content[:orig_start] + m.new_text + new_content[orig_end:]
 
-    if base_content == new_content:
-        raise ValueError(_get_no_change_error(path, len(normalized_edits)))
+        if normalized_content == new_content:
+            raise ValueError(_get_no_change_error(path, len(normalized_edits)))
 
-    return AppliedEditsResult(base_content=base_content, new_content=new_content)
+        return AppliedEditsResult(base_content=normalized_content, new_content=new_content)
+    else:
+        # Exact matching -- apply in reverse order on the original content.
+        new_content = normalized_content
+        for m in reversed(matched_edits):
+            new_content = (
+                new_content[: m.match_index]
+                + m.new_text
+                + new_content[m.match_index + m.match_length :]
+            )
+
+        if normalized_content == new_content:
+            raise ValueError(_get_no_change_error(path, len(normalized_edits)))
+
+        return AppliedEditsResult(base_content=normalized_content, new_content=new_content)
 
 
 # ---------------------------------------------------------------------------
