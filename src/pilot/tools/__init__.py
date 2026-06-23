@@ -459,6 +459,9 @@ __all__ = [
     "create_read_only_tools",
     "create_all_tools",
     "ToolName",
+    # Convenience aliases
+    "coding_tools",
+    "read_only_tools",
 ]
 
 # Re-export module-level execute functions
@@ -469,3 +472,7 @@ execute_write = write.execute
 execute_grep = grep.execute
 execute_find = find_module.execute
 execute_ls = ls_module.execute
+
+# Convenience aliases for SDK usage
+coding_tools = create_coding_tools
+read_only_tools = create_read_only_tools

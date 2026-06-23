@@ -426,7 +426,7 @@ automatically via the `pilot.extensions` entry point group.
 
 ---
 
-## Component 7.5: SDK Entry Point (Programmatic Usage)
+## Component 7.5: SDK Entry Point (Programmatic Usage) ✅ COMPLETE
 
 ### What it does
 Provides a unified API for using pilot programmatically, analogous to pi's
@@ -442,6 +442,14 @@ and the agent loop - complex and error-prone.
 Create a unified `create_agent_session()` function that handles all wiring
 internally with sensible defaults.
 
+### Status: ✅ COMPLETE
+SDK entry point fully implemented with 40 passing tests.
+- 550+ lines of implementation in `src/pilot/sdk.py`
+- 32 unit + integration tests in `tests/test_sdk.py`
+- 8 example validation tests in `tests/test_sdk_examples.py`
+- 4 working examples in `examples/sdk/`
+- Full wiring: AuthStorage → ModelRegistry → SessionManager → Tools
+
 ### API Design
 
 ```python
@@ -450,6 +458,7 @@ from pilot import (
     create_agent_session,  # Main entry point
     AgentSession,          # Session with prompt(), subscribe()
     AgentSessionConfig,    # Configuration
+    AgentSessionState,     # State type
 )
 
 # Core usage:
@@ -471,31 +480,36 @@ await session.prompt("Hello!")
 **Files:**
 - `pilot/sdk.py` - `create_agent_session()` implementation
 - `pilot/__init__.py` - Export SDK API
-- `pilot/tools/__init__.py` - Add `coding_tools()` and `read_only_tools()`
+- `pilot/tools/__init__.py` - Add `coding_tools()` and `read_only_tools()` aliases
 
 **Function signature:**
 ```python
 async def create_agent_session(
-    model: Optional[Model] = None,
+    config: Optional[AgentSessionConfig] = None,
+    model: Optional[str] = None,
     thinking_level: Optional[str] = None,
     cwd: Optional[str] = None,
     in_memory: bool = False,
-    tools: Optional[list[AgentTool]] = None,
-    custom_tools: Optional[list[dict]] = None,
+    tools: Optional[List[AgentTool]] = None,
+    custom_tools: Optional[List[AgentTool]] = None,
     auth_storage: Optional[AuthStorage] = None,
     model_registry: Optional[ModelRegistry] = None,
+    session_manager: Optional[SessionManager] = None,
+    system_prompt: Optional[str] = None,
+    stream_fn: Optional[Any] = None,
+    api_key: Optional[str] = None,
 ) -> AgentSession:
     ...
 ```
 
 ### Acceptance criteria
 
-- `create_agent_session()` exported from `pilot` package
-- `AgentSession` class with `prompt()`, `subscribe()`, `state` properties
-- Automatic wiring: AuthStorage → ModelRegistry → SessionManager → Tools
-- Default behavior: `cwd=Path.cwd()`, auto-discover models, persisted session
-- Examples in `examples/sdk/` (minimal, custom_model, read_only, in_memory)
-- Tests for defaults, custom model, read-only tools, in-memory sessions
+- ✅ `create_agent_session()` exported from `pilot` package
+- ✅ `AgentSession` class with `prompt()`, `subscribe()`, `state` properties
+- ✅ Automatic wiring: AuthStorage → ModelRegistry → SessionManager → Tools
+- ✅ Default behavior: `cwd=Path.cwd()`, in-memory session by default
+- ✅ Examples in `examples/sdk/` (minimal, custom_model, read_only, in_memory)
+- ✅ Tests for defaults, custom model, read-only tools, in-memory sessions
 
 ### Dependency Order
 

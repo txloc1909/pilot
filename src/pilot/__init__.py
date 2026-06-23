@@ -24,6 +24,14 @@ from pilot.extensions.types import (
     ToolDefinition,
 )
 
+# SDK (Component 7.5)
+from pilot.sdk import (
+    AgentSession,
+    AgentSessionConfig,
+    AgentSessionState,
+    create_agent_session,
+)
+
 __all__ = [
     "get_agent_dir",
     "get_sessions_dir",
@@ -41,4 +49,9 @@ __all__ = [
     "ExtensionFactory",
     "RegisteredTool",
     "ToolDefinition",
+    # SDK
+    "create_agent_session",
+    "AgentSession",
+    "AgentSessionConfig",
+    "AgentSessionState",
 ]

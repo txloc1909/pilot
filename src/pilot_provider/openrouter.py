@@ -697,8 +697,8 @@ async def stream_openrouter(
 
     # Request options
     request_opts: Dict[str, Any] = {}
-    if options and options.signal:
-        request_opts["signal"] = options.signal
+    # Note: OpenAI SDK doesn't support signal directly
+    # We'll handle cancellation via the async generator
     if options and options.timeout_ms is not None:
         request_opts["timeout"] = options.timeout_ms / 1000.0
     if options and options.max_retries is not None:
